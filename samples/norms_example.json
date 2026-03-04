@@ -1,0 +1,21 @@
+﻿{
+  "cispr32": {
+    "label": "CISPR 32 (exemplo)",
+    "classes": {
+      "A": {
+        "label": "Classe A",
+        "bands": [
+          { "label": "0-300", "min": 0, "max": 300, "points": [[0, 30], [300, 24]] },
+          { "label": "300-1000", "min": 300, "max": 1000, "points": [[300, 24], [1000, 18]] }
+        ]
+      },
+      "B": {
+        "label": "Classe B",
+        "bands": [
+          { "label": "0-300", "min": 0, "max": 300, "points": [[0, 24], [300, 18]] },
+          { "label": "300-1000", "min": 300, "max": 1000, "points": [[300, 18], [1000, 12]] }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,2194 @@
+﻿<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WaveSight EMC POC</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.1.min.js"></script>
+    <style>
+      :root {
+        --bg: #0f141a;
+        --panel: #151b23;
+        --accent: #57d6ff;
+        --text: #e7edf3;
+        --muted: #96a3ad;
+        --border: #1f2a36;
+        --chip: #0f1f2c;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        background: radial-gradient(1200px 600px at 20% 10%, #1b2635 0%, #0f141a 50%, #0b0f14 100%);
+        color: var(--text);
+      }
+      header {
+        padding: 24px 28px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: 0.4px; }
+      p { margin: 0; color: var(--muted); }
+      .title-block { display: grid; gap: 4px; }
+      .session-box {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .auth-status {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .auth-status.error { color: #ff8f8f; }
+      .auth-status.ok { color: #7fe0a2; }
+      .auth-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        background: linear-gradient(160deg, rgba(8, 12, 18, 0.9) 0%, rgba(8, 12, 18, 0.74) 100%);
+        backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .auth-card {
+        width: min(460px, 100%);
+        background: linear-gradient(160deg, #141c26 0%, #10161e 100%);
+        border: 1px solid #2b3b4f;
+        border-radius: 14px;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+        padding: 22px;
+        display: grid;
+        gap: 14px;
+      }
+      .auth-card h2 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 0.2px;
+      }
+      .auth-subtitle {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .auth-field {
+        display: grid;
+        gap: 6px;
+      }
+      .auth-field label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .auth-field input {
+        width: 100%;
+        background: #0f151d;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        outline: none;
+        padding: 10px 12px;
+      }
+      .auth-field input:focus {
+        border-color: var(--accent);
+      }
+      .auth-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .user-badge {
+        background: #0f1f2c;
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+      .container {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+        padding: 20px 28px 40px;
+      }
+      body.auth-locked .container,
+      body.auth-locked header {
+        filter: blur(2px);
+        pointer-events: none;
+        user-select: none;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+      }
+      .controls {
+        display: grid;
+        gap: 10px;
+      }
+      .control-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .dropzone {
+        position: relative;
+        border: 1px dashed var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        background: #0c1219;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .dropzone.dragover {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(87, 214, 255, 0.15);
+      }
+      .dropzone input[type="file"] {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .dropzone-text {
+        display: grid;
+        gap: 4px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .file-list {
+        font-size: 12px;
+        color: var(--text);
+        display: grid;
+        gap: 4px;
+      }
+      .file-chip {
+        background: #0f1f2c;
+        border: 1px solid var(--border);
+        padding: 4px 8px;
+        border-radius: 999px;
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .section-title {
+        font-size: 13px;
+        letter-spacing: 0.4px;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin-bottom: 10px;
+      }
+      .pill-list { display: flex; gap: 8px; flex-wrap: wrap; }
+      .pill {
+        background: #0f1f2c;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        color: var(--text);
+      }
+      .pill button {
+        background: transparent;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0 4px;
+      }
+      .control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #0f151d;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6px 10px;
+      }
+      .control input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+      }
+      .control label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      input[type="file"] { color: var(--muted); }
+      input[type="number"], select {
+        background: #0f151d;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        outline: none;
+        min-width: 70px;
+        padding: 4px 8px;
+      }
+      select {
+        appearance: none;
+        padding-right: 26px;
+        background-image:
+          linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+          linear-gradient(135deg, var(--muted) 50%, transparent 50%),
+          linear-gradient(to right, transparent, transparent);
+        background-position:
+          calc(100% - 16px) 55%,
+          calc(100% - 11px) 55%,
+          0 0;
+        background-size: 5px 5px, 5px 5px, 100% 100%;
+        background-repeat: no-repeat;
+      }
+      select:focus, input[type="number"]:focus {
+        border-color: var(--accent);
+      }
+      select option {
+        background-color: #0f151d;
+        color: var(--text);
+      }
+      button {
+        background: var(--accent);
+        border: none;
+        color: #081018;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+      button:disabled { opacity: 0.6; cursor: not-allowed; }
+      .toggle { background: transparent; border: 1px solid var(--border); color: var(--text); }
+      .status { color: var(--muted); font-size: 14px; }
+      .status.ok { color: #6ddf7a; }
+      .status.error { color: #ff6b6b; }
+      .status.loading { color: var(--muted); }
+      .spinner {
+        width: 12px;
+        height: 12px;
+        border: 2px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        display: inline-block;
+        animation: spin 0.8s linear infinite;
+        margin-left: 6px;
+      }
+      .hidden { display: none; }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .stats { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+      .stat-card {
+        background: var(--chip);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .stat-card strong { color: var(--text); }
+      .pattern-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+      .pattern-card {
+        background: #0f1f2c;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .band-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      .band-table th, .band-table td {
+        border: 1px solid var(--border);
+        padding: 6px 8px;
+        text-align: left;
+      }
+      .band-table th { background: #0f1f2c; color: var(--muted); }
+      .plot { width: 100%; height: 420px; }
+      .plot-3d { width: 100%; height: 520px; }
+      a { color: var(--accent); }
+      @media (max-width: 860px) {
+        header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body class="auth-locked">
+    <header>
+      <div class="title-block">
+        <h1>WaveSight EMC POC</h1>
+        <p>Upload de CSV com frequência x intensidade (dBµV) e visualização interativa.</p>
+      </div>
+      <div class="session-box">
+        <span id="userBadge" class="user-badge hidden"></span>
+        <button id="btnLogout" class="secondary hidden" disabled>Sair</button>
+      </div>
+    </header>
+
+    <div id="authOverlay" class="auth-overlay">
+      <div class="auth-card">
+        <h2>Acesso ao WaveSight</h2>
+        <p class="auth-subtitle">Entre para processar medições ou crie sua conta.</p>
+        <div class="auth-field">
+          <label for="authName">Nome</label>
+          <input id="authName" type="text" placeholder="Seu nome" />
+        </div>
+        <div class="auth-field">
+          <label for="authEmail">Email</label>
+          <input id="authEmail" type="email" placeholder="voce@empresa.com" />
+        </div>
+        <div class="auth-field">
+          <label for="authPassword">Senha</label>
+          <input id="authPassword" type="password" placeholder="Minimo de 8 caracteres" />
+        </div>
+        <div class="auth-actions">
+          <button id="btnLogin">Entrar</button>
+          <button id="btnRegister" class="secondary">Criar conta</button>
+        </div>
+        <span id="authStatus" class="auth-status"></span>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="panel">
+        <div class="controls">
+          <div class="control-row">
+            <div id="dropzone" class="dropzone">
+              <input id="fileInput" type="file" accept=".csv" multiple />
+              <div class="dropzone-text">
+                <strong>Arraste seus CSVs aqui</strong>
+                <span>ou clique para selecionar</span>
+                <div id="fileList" class="file-list"></div>
+              </div>
+            </div>
+            <button id="btnUpload">Processar</button>
+            <button id="btnReport" class="secondary" disabled>Baixar relatório (HTML)</button>
+            <button id="btnReportPdf" class="secondary" disabled>Imprimir PDF</button>
+            <button id="btn3d" class="secondary" disabled>Alternar 3D</button>
+            <button id="btnClear" class="secondary">Limpar</button>
+            <span id="status" class="status loading"></span>
+            <span id="spinner" class="spinner hidden" aria-hidden="true"></span>
+          </div>
+
+          <div class="control-row">
+            <div class="control">
+              <label for="presetSelect">Preset</label>
+              <select id="presetSelect">
+                <option value="manual">Manual</option>
+                <option value="lowband">Banda baixa</option>
+                <option value="highband">Banda alta</option>
+                <option value="aggressive">Picos agressivos</option>
+              </select>
+            </div>
+            <div class="control">
+              <label for="smoothingMethod">Suavização</label>
+              <select id="smoothingMethod">
+                <option value="none">Nenhuma</option>
+                <option value="moving">Média móvel</option>
+                <option value="savgol">Savitzky-Golay</option>
+              </select>
+            </div>
+            <div class="control">
+              <label for="smoothingWindow">Janela</label>
+              <input id="smoothingWindow" type="number" min="1" value="7" />
+            </div>
+            <div class="control">
+              <label for="peakMinHeight">Pico min (dBµV)</label>
+              <input id="peakMinHeight" type="number" step="0.1" placeholder="ex: 10" />
+            </div>
+            <div class="control">
+              <label for="peakMinDistance">Distância</label>
+              <input id="peakMinDistance" type="number" min="1" placeholder="ex: 5" />
+            </div>
+            <div class="control">
+              <label for="maxPeaks">Máx picos</label>
+              <input id="maxPeaks" type="number" min="10" value="200" />
+            </div>
+            <div class="control">
+              <label for="freqMin">Freq min</label>
+              <input id="freqMin" type="number" step="0.1" placeholder="ex: 10" />
+            </div>
+            <div class="control">
+              <label for="freqMax">Freq max</label>
+              <input id="freqMax" type="number" step="0.1" placeholder="ex: 100" />
+            </div>
+            <div class="control">
+              <label for="showPeaks">Mostrar picos</label>
+              <input id="showPeaks" type="checkbox" checked />
+            </div>
+          </div>
+          <div class="control-row">
+            <div class="control">
+              <label for="limitSource">Fonte limite</label>
+              <select id="limitSource">
+                <option value="none">Nenhum</option>
+                <option value="file">Arquivo CSV</option>
+                <option value="preset">Preset</option>
+                <option value="norm">Norma</option>
+              </select>
+            </div>
+            <div class="control">
+              <label for="limitInput">Curva limite</label>
+              <input id="limitInput" type="file" accept=".csv" />
+            </div>
+            <div class="control">
+              <label for="limitPreset">Preset limite</label>
+              <select id="limitPreset">
+                <option value="none">Nenhum</option>
+                <option value="cispr_a">CISPR A (exemplo)</option>
+                <option value="cispr_b">CISPR B (exemplo)</option>
+                <option value="iec_generic">IEC (exemplo)</option>
+              </select>
+            </div>
+            <div class="control">
+              <label for="normSelect">Norma</label>
+              <select id="normSelect"></select>
+            </div>
+            <div class="control">
+              <label for="normFile">Norma JSON</label>
+              <input id="normFile" type="file" accept=".json" />
+            </div>
+            <div class="control">
+              <label for="normClass">Classe</label>
+              <select id="normClass"></select>
+            </div>
+            <div class="control">
+              <label for="normBand">Faixa</label>
+              <select id="normBand"></select>
+            </div>
+            <div class="control">
+              <label for="limitEnabled">Usar limite</label>
+              <input id="limitEnabled" type="checkbox" />
+            </div>
+            <div class="control">
+              <label for="limitMargin">Margem (dB)</label>
+              <input id="limitMargin" type="number" step="0.1" value="0" />
+            </div>
+            <div class="control">
+              <label for="bandPreset">Preset banda</label>
+              <select id="bandPreset">
+                <option value="none">Nenhum</option>
+                <option value="basic">Baixa/Média/Alta</option>
+                <option value="wide">0-100 / 100-1000</option>
+              </select>
+            </div>
+            <div class="control">
+              <label for="bandMin">Banda min</label>
+              <input id="bandMin" type="number" step="0.1" placeholder="ex: 0.15" />
+            </div>
+            <div class="control">
+              <label for="bandMax">Banda max</label>
+              <input id="bandMax" type="number" step="0.1" placeholder="ex: 30" />
+            </div>
+            <button id="btnAddBand" class="secondary">Adicionar banda</button>
+            <div class="control">
+              <label for="mode3d">3D</label>
+              <select id="mode3d">
+                <option value="lines">Linhas</option>
+                <option value="surface">Superfície</option>
+              </select>
+            </div>
+            <div class="control">
+              <label for="bins3d">Bins 3D</label>
+              <input id="bins3d" type="number" min="50" max="800" value="200" />
+            </div>
+            <div class="control">
+              <label for="maxPoints">Max pontos</label>
+              <input id="maxPoints" type="number" min="200" max="20000" value="5000" />
+            </div>
+          </div>
+          <div class="control-row">
+            <div class="control">
+              <label for="exportWidth">Export Largura</label>
+              <input id="exportWidth" type="number" min="600" max="6000" value="1600" />
+            </div>
+            <div class="control">
+              <label for="exportHeight">Export Altura</label>
+              <input id="exportHeight" type="number" min="400" max="4000" value="900" />
+            </div>
+            <div class="control">
+              <label for="exportTheme">Tema export</label>
+              <select id="exportTheme">
+                <option value="dark">Escuro</option>
+                <option value="light">Claro</option>
+              </select>
+            </div>
+            <button id="btnExportImage" class="secondary">Exportar imagem</button>
+            <div class="control">
+              <label for="baselineSelect">Baseline</label>
+              <select id="baselineSelect"></select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div id="stats" class="stats"></div>
+      </div>
+
+      <div class="panel">
+        <div class="section-title">Padrões detectados</div>
+        <div id="patterns" class="pattern-grid"></div>
+      </div>
+
+      <div class="panel">
+        <div class="section-title">Bandas</div>
+        <div id="bandList" class="pill-list"></div>
+        <div id="bandStats"></div>
+      </div>
+
+      <div class="panel">
+        <div class="section-title">Comparação entre medições</div>
+        <div id="comparison"></div>
+      </div>
+
+      <div class="panel">
+        <div id="plot2d" class="plot"></div>
+      </div>
+
+      <div class="panel" id="panel3d" style="display:none;">
+        <div id="plot3d" class="plot-3d"></div>
+      </div>
+    </div>
+
+    <script>
+      const API_URL = `${window.location.origin}/api`;
+      const fileInput = document.getElementById("fileInput");
+      const dropzone = document.getElementById("dropzone");
+      const fileList = document.getElementById("fileList");
+      const btnUpload = document.getElementById("btnUpload");
+      const btnReport = document.getElementById("btnReport");
+      const btnReportPdf = document.getElementById("btnReportPdf");
+      const btn3d = document.getElementById("btn3d");
+      const btnClear = document.getElementById("btnClear");
+      const statusEl = document.getElementById("status");
+      const spinnerEl = document.getElementById("spinner");
+      const statsEl = document.getElementById("stats");
+      const panel3d = document.getElementById("panel3d");
+
+      const presetSelect = document.getElementById("presetSelect");
+      const smoothingMethod = document.getElementById("smoothingMethod");
+      const smoothingWindow = document.getElementById("smoothingWindow");
+      const peakMinHeight = document.getElementById("peakMinHeight");
+      const peakMinDistance = document.getElementById("peakMinDistance");
+      const maxPeaks = document.getElementById("maxPeaks");
+      const freqMin = document.getElementById("freqMin");
+      const freqMax = document.getElementById("freqMax");
+      const showPeaks = document.getElementById("showPeaks");
+      const limitInput = document.getElementById("limitInput");
+      const limitPreset = document.getElementById("limitPreset");
+      const limitSource = document.getElementById("limitSource");
+      const normSelect = document.getElementById("normSelect");
+      const normFile = document.getElementById("normFile");
+      const normClass = document.getElementById("normClass");
+      const normBand = document.getElementById("normBand");
+      const limitEnabled = document.getElementById("limitEnabled");
+      const limitMargin = document.getElementById("limitMargin");
+      const bandPreset = document.getElementById("bandPreset");
+      const bandMin = document.getElementById("bandMin");
+      const bandMax = document.getElementById("bandMax");
+      const btnAddBand = document.getElementById("btnAddBand");
+      const mode3d = document.getElementById("mode3d");
+      const bins3d = document.getElementById("bins3d");
+      const maxPoints = document.getElementById("maxPoints");
+      const exportWidth = document.getElementById("exportWidth");
+      const exportHeight = document.getElementById("exportHeight");
+      const exportTheme = document.getElementById("exportTheme");
+      const btnExportImage = document.getElementById("btnExportImage");
+      const baselineSelect = document.getElementById("baselineSelect");
+      const patternsEl = document.getElementById("patterns");
+      const bandListEl = document.getElementById("bandList");
+      const bandStatsEl = document.getElementById("bandStats");
+      const comparisonEl = document.getElementById("comparison");
+      const authName = document.getElementById("authName");
+      const authEmail = document.getElementById("authEmail");
+      const authPassword = document.getElementById("authPassword");
+      const btnRegister = document.getElementById("btnRegister");
+      const btnLogin = document.getElementById("btnLogin");
+      const btnLogout = document.getElementById("btnLogout");
+      const authStatusEl = document.getElementById("authStatus");
+      const userBadgeEl = document.getElementById("userBadge");
+      const authOverlay = document.getElementById("authOverlay");
+
+      let lastSeries = [];
+      let show3d = false;
+      let limitSeries = null;
+      let limitFilename = null;
+      let limitFileSeries = null;
+      let limitFileName = null;
+      let limitPresetSeries = null;
+      let limitPresetName = null;
+      let limitNormSeries = null;
+      let limitNormName = null;
+      let userNorms = {};
+      let bands = [];
+      let authToken = localStorage.getItem("wavesight_token") || "";
+      let currentUser = null;
+
+      const colors = ["#57d6ff", "#ffb454", "#6ddf7a", "#ff6b6b", "#8c7bff", "#00d4a4"];
+      const builtinNorms = {
+        cispr_example: {
+          label: "CISPR (exemplo)",
+          classes: {
+            A: {
+              label: "Classe A",
+              bands: [
+                { label: "0-300", min: 0, max: 300, points: [[0, 30], [300, 24]] },
+                { label: "300-1000", min: 300, max: 1000, points: [[300, 24], [1000, 18]] }
+              ]
+            },
+            B: {
+              label: "Classe B",
+              bands: [
+                { label: "0-300", min: 0, max: 300, points: [[0, 24], [300, 18]] },
+                { label: "300-1000", min: 300, max: 1000, points: [[300, 18], [1000, 12]] }
+              ]
+            }
+          }
+        },
+        iec_example: {
+          label: "IEC (exemplo)",
+          classes: {
+            Generic: {
+              label: "Genérico",
+              bands: [
+                { label: "0-500", min: 0, max: 500, points: [[0, 28], [500, 20]] },
+                { label: "500-1000", min: 500, max: 1000, points: [[500, 20], [1000, 16]] }
+              ]
+            }
+          }
+        }
+      };
+
+      function setStatus(text, type = "loading") {
+        statusEl.textContent = text;
+        statusEl.classList.remove("ok", "error", "loading");
+        statusEl.classList.add(type);
+      }
+      function setLoading(isLoading) {
+        spinnerEl.classList.toggle("hidden", !isLoading);
+      }
+
+      function setAuthStatus(text, type = "info") {
+        authStatusEl.textContent = text;
+        authStatusEl.classList.remove("ok", "error");
+        if (type === "ok" || type === "error") {
+          authStatusEl.classList.add(type);
+        }
+      }
+
+      function getAuthHeaders() {
+        if (!authToken) return {};
+        return { Authorization: `Bearer ${authToken}` };
+      }
+
+      function updateAuthUi() {
+        const loggedIn = !!currentUser;
+        authOverlay.classList.toggle("hidden", loggedIn);
+        document.body.classList.toggle("auth-locked", !loggedIn);
+
+        btnLogout.disabled = !loggedIn;
+        btnLogout.classList.toggle("hidden", !loggedIn);
+        btnLogin.disabled = false;
+        btnRegister.disabled = false;
+        authName.disabled = loggedIn;
+        authEmail.disabled = false;
+        authPassword.disabled = false;
+        fileInput.disabled = !loggedIn;
+        dropzone.style.opacity = loggedIn ? "1" : "0.5";
+        btnUpload.disabled = !loggedIn;
+        if (!loggedIn) {
+          btn3d.disabled = true;
+          btnReport.disabled = true;
+          btnReportPdf.disabled = true;
+        }
+        userBadgeEl.classList.toggle("hidden", !loggedIn);
+        userBadgeEl.textContent = loggedIn ? `${currentUser.name} (${currentUser.email})` : "";
+      }
+
+      async function loadCurrentUser() {
+        if (!authToken) {
+          currentUser = null;
+          setAuthStatus("Entre com sua conta para continuar.");
+          updateAuthUi();
+          return;
+        }
+        try {
+          const res = await fetch(`${API_URL}/auth/me`, {
+            headers: {
+              ...getAuthHeaders()
+            }
+          });
+          if (!res.ok) throw new Error("Sessao invalida");
+          currentUser = await res.json();
+          setAuthStatus("Autenticado", "ok");
+        } catch (_err) {
+          authToken = "";
+          currentUser = null;
+          localStorage.removeItem("wavesight_token");
+          setAuthStatus("Sessao expirada. Faca login.", "error");
+        }
+        updateAuthUi();
+      }
+
+      async function registerUser() {
+        const name = (authName.value || "").trim();
+        const email = (authEmail.value || "").trim();
+        const password = authPassword.value || "";
+        if (!name || !email || !password) {
+          setAuthStatus("Preencha nome, email e senha.", "error");
+          return;
+        }
+        try {
+          btnRegister.disabled = true;
+          const res = await fetch(`${API_URL}/auth/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email, password })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || "Falha no cadastro");
+          authToken = data.access_token;
+          localStorage.setItem("wavesight_token", authToken);
+          authPassword.value = "";
+          setAuthStatus("Conta criada com sucesso.", "ok");
+          await loadCurrentUser();
+        } catch (err) {
+          setAuthStatus(err.message || "Falha no cadastro", "error");
+        } finally {
+          if (!currentUser) btnRegister.disabled = false;
+        }
+      }
+
+      async function loginUser() {
+        const email = (authEmail.value || "").trim();
+        const password = authPassword.value || "";
+        if (!email || !password) {
+          setAuthStatus("Preencha email e senha.", "error");
+          return;
+        }
+        try {
+          btnLogin.disabled = true;
+          const res = await fetch(`${API_URL}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || "Falha no login");
+          authToken = data.access_token;
+          localStorage.setItem("wavesight_token", authToken);
+          authPassword.value = "";
+          setAuthStatus("Login realizado.", "ok");
+          await loadCurrentUser();
+        } catch (err) {
+          setAuthStatus(err.message || "Falha no login", "error");
+        } finally {
+          if (!currentUser) btnLogin.disabled = false;
+        }
+      }
+
+      function logoutUser() {
+        authToken = "";
+        currentUser = null;
+        localStorage.removeItem("wavesight_token");
+        setAuthStatus("Sessao encerrada.");
+        updateAuthUi();
+      }
+
+      function getNorms() {
+        return { ...builtinNorms, ...userNorms };
+      }
+
+      function refreshNormSelectors() {
+        const norms = getNorms();
+        normSelect.innerHTML = "";
+        const noneOpt = document.createElement("option");
+        noneOpt.value = "none";
+        noneOpt.textContent = "Nenhuma";
+        normSelect.appendChild(noneOpt);
+        Object.entries(norms).forEach(([key, norm]) => {
+          const opt = document.createElement("option");
+          opt.value = key;
+          opt.textContent = norm.label || key;
+          normSelect.appendChild(opt);
+        });
+        normSelect.value = "none";
+        refreshClassOptions();
+      }
+
+      function refreshClassOptions() {
+        const norms = getNorms();
+        const norm = norms[normSelect.value];
+        normClass.innerHTML = "";
+        normBand.innerHTML = "";
+        if (!norm) return;
+        Object.entries(norm.classes || {}).forEach(([key, cls]) => {
+          const opt = document.createElement("option");
+          opt.value = key;
+          opt.textContent = cls.label || key;
+          normClass.appendChild(opt);
+        });
+        refreshBandOptions();
+      }
+
+      function refreshBandOptions() {
+        const norms = getNorms();
+        const norm = norms[normSelect.value];
+        normBand.innerHTML = "";
+        if (!norm) return;
+        const cls = norm.classes ? norm.classes[normClass.value] : null;
+        if (!cls || !cls.bands) return;
+        cls.bands.forEach((band, idx) => {
+          const opt = document.createElement("option");
+          opt.value = String(idx);
+          opt.textContent = band.label || `Banda ${idx + 1}`;
+          normBand.appendChild(opt);
+        });
+      }
+
+      function updateLimitSourceUI() {
+        const src = limitSource.value;
+        limitInput.disabled = src !== "file";
+        limitPreset.disabled = src !== "preset";
+        normSelect.disabled = src !== "norm";
+        normClass.disabled = src !== "norm";
+        normBand.disabled = src !== "norm";
+      }
+
+      function computeStats(values) {
+        if (!values.length) return null;
+        let min = values[0];
+        let max = values[0];
+        let sum = 0;
+        for (const v of values) {
+          if (v < min) min = v;
+          if (v > max) max = v;
+          sum += v;
+        }
+        const mean = sum / values.length;
+        let variance = 0;
+        for (const v of values) {
+          variance += (v - mean) ** 2;
+        }
+        const std = Math.sqrt(variance / values.length);
+        return { min, max, mean, std };
+      }
+
+      function renderStats(series, filterActive, limitActive) {
+        if (!series || series.length === 0) {
+          statsEl.innerHTML = "";
+          return;
+        }
+        statsEl.innerHTML = series.map((s, idx) => `
+          <div class="stat-card">
+            <div><strong>${s.filename || `Medição ${idx + 1}`}</strong></div>
+            <div>Amostras: <strong>${s.count}</strong>${filterActive ? " (filtrado)" : ""}</div>
+            <div>Min: <strong>${s.stats.min.toFixed(2)} dBµV</strong></div>
+            <div>Max: <strong>${s.stats.max.toFixed(2)} dBµV</strong></div>
+            <div>Média: <strong>${s.stats.mean.toFixed(2)} dBµV</strong></div>
+            <div>Desvio: <strong>${s.stats.std.toFixed(2)} dBµV</strong></div>
+            ${limitActive && s.limit ? `<div>Excedências: <strong>${s.limit.exceedances}</strong> (max ${s.limit.maxMargin.toFixed(2)} dB)</div>` : ""}
+            ${s.smoothing && s.smoothing.method !== "none" ? `<div>Suavização: <strong>${s.smoothing.method}</strong> (${s.smoothing.window})</div>` : ""}
+          </div>
+        `).join("");
+      }
+
+      function renderPatterns(series) {
+        if (!series.length) {
+          patternsEl.innerHTML = "";
+          return;
+        }
+        const cards = [];
+        series.forEach((s, idx) => {
+          const patterns = s.patterns || {};
+          const harmonics = patterns.harmonics;
+          const spacing = patterns.spacing;
+          if (!harmonics && !spacing) return;
+          cards.push(`
+            <div class="pattern-card">
+              <div><strong>${s.filename || `Medição ${idx + 1}`}</strong></div>
+              ${harmonics ? `<div>Fundamental: <strong>${harmonics.fundamental.toFixed(2)}</strong> (harmônicos: ${harmonics.count})</div>` : ""}
+              ${spacing ? `<div>Espaçamento dominante: <strong>${spacing.delta.toFixed(2)}</strong> (ocorrências: ${spacing.count})</div>` : ""}
+            </div>
+          `);
+        });
+        patternsEl.innerHTML = cards.length ? cards.join("") : "<div class=\"status\">Nenhum padrão detectado.</div>";
+      }
+
+      function detectDelimiter(line) {
+        const candidates = [",", ";", "\t"];
+        let best = ",";
+        let bestCount = -1;
+        candidates.forEach(delim => {
+          const count = line.split(delim).length;
+          if (count > bestCount) {
+            best = delim;
+            bestCount = count;
+          }
+        });
+        return best;
+      }
+
+      function parseCsvText(text) {
+        const lines = text.split(/\r?\n/).filter(l => l.trim().length);
+        if (!lines.length) return null;
+        const delimiter = detectDelimiter(lines[0]);
+        const rows = [];
+        for (const line of lines) {
+          const parts = line.split(delimiter).map(p => p.trim());
+          if (parts.length < 2) continue;
+          const x = parseFloat(parts[0]);
+          const y = parseFloat(parts[1]);
+          if (Number.isNaN(x) || Number.isNaN(y)) continue;
+          rows.push([x, y]);
+        }
+        if (!rows.length) return null;
+        rows.sort((a, b) => a[0] - b[0]);
+        return {
+          frequency: rows.map(r => r[0]),
+          intensity: rows.map(r => r[1])
+        };
+      }
+
+      function readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsText(file);
+        });
+      }
+
+      async function loadLimitFile(file) {
+        try {
+          const text = await readFileAsText(file);
+          const parsed = parseCsvText(String(text));
+          if (!parsed) {
+            setStatus("Curva limite inválida", "error");
+            return;
+          }
+          limitFileSeries = parsed;
+          limitFileName = file.name || "limite.csv";
+          limitSource.value = "file";
+          updateLimitSourceUI();
+          limitPreset.value = "none";
+          normSelect.value = "none";
+          refreshClassOptions();
+          limitEnabled.checked = true;
+          setStatus("Curva limite carregada", "ok");
+          refreshPlots();
+        } catch (err) {
+          setStatus("Falha ao ler curva limite", "error");
+        }
+      }
+
+      async function loadNormFile(file) {
+        try {
+          const text = await readFileAsText(file);
+          const json = JSON.parse(String(text));
+          const standards = json.standards || json;
+          if (!standards || typeof standards !== "object") {
+            setStatus("JSON de normas inválido", "error");
+            return;
+          }
+          userNorms = standards;
+          refreshNormSelectors();
+          setStatus("Normas carregadas", "ok");
+        } catch (err) {
+          setStatus("Falha ao ler normas", "error");
+        }
+      }
+
+      function generateLimitPreset(preset, series) {
+        if (preset === "none") return null;
+        let min = 0;
+        let max = 1000;
+        if (series && series.length) {
+          const allFreq = series.flatMap(s => s.frequency);
+          if (allFreq.length) {
+            min = Math.min(...allFreq);
+            max = Math.max(...allFreq);
+          }
+        }
+        const points = 801;
+        const freq = Array.from({ length: points }, (_, i) => min + (i * (max - min)) / (points - 1));
+        let inten = [];
+        if (preset === "cispr_a") {
+          inten = freq.map(f => 28 - 0.006 * f);
+        } else if (preset === "cispr_b") {
+          inten = freq.map(f => 22 - 0.0045 * f);
+        } else {
+          inten = freq.map(f => 30 - 0.008 * f);
+        }
+        return { frequency: freq, intensity: inten };
+      }
+
+      function generateLimitFromBand(band) {
+        if (!band) return null;
+        let min = band.min;
+        let max = band.max;
+        if (band.points && band.points.length) {
+          const xs = band.points.map(p => p[0]).sort((a, b) => a - b);
+          min = min ?? xs[0];
+          max = max ?? xs[xs.length - 1];
+        }
+        if (min == null || max == null || max <= min) return null;
+        const points = 801;
+        const freq = Array.from({ length: points }, (_, i) => min + (i * (max - min)) / (points - 1));
+        if (band.limit != null) {
+          return { frequency: freq, intensity: freq.map(() => band.limit) };
+        }
+        if (!band.points || band.points.length < 2) return null;
+        const xs = band.points.map(p => p[0]);
+        const ys = band.points.map(p => p[1]);
+        const intensity = freq.map(f => {
+          const val = interpolateAt(xs, ys, f);
+          return val == null ? ys[0] : val;
+        });
+        return { frequency: freq, intensity };
+      }
+
+      function applyLimitNorm() {
+        const norms = getNorms();
+        const norm = norms[normSelect.value];
+        if (!norm) {
+          limitNormSeries = null;
+          limitNormName = null;
+          refreshPlots();
+          return;
+        }
+        const cls = norm.classes ? norm.classes[normClass.value] : null;
+        const bandsList = cls && cls.bands ? cls.bands : [];
+        const bandIndex = parseInt(normBand.value || "0", 10);
+        const band = bandsList[bandIndex];
+        limitNormSeries = generateLimitFromBand(band);
+        if (!limitNormSeries) {
+          setStatus("Faixa de norma inválida", "error");
+          return;
+        }
+        limitNormName = `${norm.label || normSelect.value} - ${cls ? cls.label || normClass.value : ""} - ${band ? band.label : ""}`;
+        limitSource.value = "norm";
+        updateLimitSourceUI();
+        limitEnabled.checked = true;
+        limitInput.value = "";
+        limitPreset.value = "none";
+        setStatus("Norma aplicada", "ok");
+        refreshPlots();
+      }
+
+      function updateLimitSeries() {
+        if (!limitEnabled.checked || limitSource.value === "none") {
+          limitSeries = null;
+          limitFilename = null;
+          return;
+        }
+        if (limitSource.value === "file") {
+          limitSeries = limitFileSeries;
+          limitFilename = limitFileName;
+        } else if (limitSource.value === "preset") {
+          limitSeries = limitPresetSeries;
+          limitFilename = limitPresetName;
+        } else if (limitSource.value === "norm") {
+          limitSeries = limitNormSeries;
+          limitFilename = limitNormName;
+        }
+      }
+
+      function applyLimitPreset() {
+        const preset = limitPreset.value;
+        if (preset === "none") {
+          limitPresetSeries = null;
+          limitPresetName = null;
+          refreshPlots();
+          return;
+        }
+        limitPresetSeries = generateLimitPreset(preset, lastSeries);
+        if (!limitPresetSeries) return;
+        limitPresetName = `${preset}.csv`;
+        limitSource.value = "preset";
+        updateLimitSourceUI();
+        limitEnabled.checked = true;
+        limitInput.value = "";
+        setStatus("Preset de limite aplicado", "ok");
+        refreshPlots();
+      }
+
+      function interpolateAt(xs, ys, xq) {
+        if (!xs.length) return null;
+        if (xq <= xs[0]) return ys[0];
+        if (xq >= xs[xs.length - 1]) return ys[ys.length - 1];
+        let lo = 0;
+        let hi = xs.length - 1;
+        while (hi - lo > 1) {
+          const mid = Math.floor((lo + hi) / 2);
+          if (xs[mid] <= xq) {
+            lo = mid;
+          } else {
+            hi = mid;
+          }
+        }
+        const x0 = xs[lo];
+        const x1 = xs[hi];
+        const y0 = ys[lo];
+        const y1 = ys[hi];
+        const t = (xq - x0) / (x1 - x0);
+        return y0 + t * (y1 - y0);
+      }
+
+      function decimateArray(xs, ys, maxCount) {
+        const len = xs.length;
+        if (len <= maxCount) return { xs, ys };
+        const step = Math.ceil(len / maxCount);
+        const dx = [];
+        const dy = [];
+        for (let i = 0; i < len; i += step) {
+          dx.push(xs[i]);
+          dy.push(ys[i]);
+        }
+        if (dx[dx.length - 1] !== xs[len - 1]) {
+          dx.push(xs[len - 1]);
+          dy.push(ys[len - 1]);
+        }
+        return { xs: dx, ys: dy };
+      }
+
+      function decimateSeries(series) {
+        const maxCount = Math.max(200, Math.min(20000, parseInt(maxPoints.value || "5000", 10)));
+        return series.map(s => {
+          const decimated = decimateArray(s.frequency, s.intensity, maxCount);
+          return {
+            ...s,
+            frequency: decimated.xs,
+            intensity: decimated.ys
+          };
+        });
+      }
+
+      function buildCsvForSeries(series) {
+        const lines = [];
+        const includeLimit = limitEnabled.checked && limitSeries;
+        lines.push(`frequency,intensity${includeLimit ? ",limit" : ""}`);
+        const xs = series.frequency;
+        const ys = series.intensity;
+        const margin = parseFloat(limitMargin.value || "0") || 0;
+        for (let i = 0; i < xs.length; i++) {
+          let line = `${xs[i]},${ys[i]}`;
+          if (includeLimit) {
+            const limitVal = interpolateAt(limitSeries.frequency, limitSeries.intensity, xs[i]);
+            const value = limitVal !== null ? limitVal + margin : null;
+            line += `,${value !== null ? value.toFixed(6) : ""}`;
+          }
+          lines.push(line);
+        }
+        return lines.join("\n");
+      }
+
+      function buildParamsLog() {
+        return {
+          smoothing: smoothingMethod.value,
+          smoothing_window: smoothingWindow.value,
+          peak_min_height: peakMinHeight.value || null,
+          peak_min_distance: peakMinDistance.value || null,
+          max_peaks: maxPeaks.value,
+          freq_min: freqMin.value || null,
+          freq_max: freqMax.value || null,
+          show_peaks: showPeaks.checked,
+          limit_source: limitSource.value,
+          limit_enabled: limitEnabled.checked,
+          limit_filename: limitFilename,
+          limit_norm: {
+            standard: normSelect.value,
+            class: normClass.value,
+            band: normBand.value
+          },
+          limit_margin: limitMargin.value || 0,
+          bands: bands,
+          export: {
+            width: exportWidth.value,
+            height: exportHeight.value,
+            theme: exportTheme.value
+          },
+          mode3d: mode3d.value,
+          bins3d: bins3d.value,
+          max_points: maxPoints.value
+        };
+      }
+
+      function buildRunLog(series) {
+        const lines = [];
+        lines.push(`WaveSight EMC POC - Log`);
+        lines.push(`Gerado em: ${new Date().toISOString()}`);
+        lines.push(`Arquivos: ${series.map(s => s.filename || "sem_nome").join(", ")}`);
+        lines.push(`Total series: ${series.length}`);
+        lines.push(`Limit: ${limitEnabled.checked ? `${limitSource.value} (${limitFilename || "ativo"})` : "não"}`);
+        lines.push(`Bands: ${bands.length ? bands.map(b => `${b.label}(${b.min}-${b.max})`).join(", ") : "nenhuma"}`);
+        return lines.join("\n");
+      }
+
+      function downloadBlob(filename, content, mime) {
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function downloadDataUrl(filename, dataUrl) {
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+
+      function downloadAttachments(series) {
+        const params = buildParamsLog();
+        downloadBlob("wavesight-params.json", JSON.stringify(params, null, 2), "application/json");
+        downloadBlob("wavesight-log.txt", buildRunLog(series), "text/plain;charset=utf-8");
+        series.forEach((s, idx) => {
+          const csv = buildCsvForSeries(s);
+          const safeName = (s.filename || `medicao_${idx + 1}`).replace(/[^a-zA-Z0-9._-]/g, "_");
+          downloadBlob(`wavesight-filtrado-${safeName}.csv`, csv, "text/csv;charset=utf-8");
+        });
+      }
+
+      function applyLimit(series) {
+        updateLimitSeries();
+        if (!limitEnabled.checked || !limitSeries) {
+          return { series, limitActive: false };
+        }
+        const margin = parseFloat(limitMargin.value || "0") || 0;
+        const xs = limitSeries.frequency;
+        const ys = limitSeries.intensity.map(v => v + margin);
+        const updated = series.map(s => {
+          let exceedances = 0;
+          let maxMargin = 0;
+          const exceedPoints = [];
+          for (let i = 0; i < s.frequency.length; i++) {
+            const f = s.frequency[i];
+            const limitVal = interpolateAt(xs, ys, f);
+            if (limitVal === null) continue;
+            const marginVal = s.intensity[i] - limitVal;
+            if (marginVal > 0) {
+              exceedances += 1;
+              if (marginVal > maxMargin) maxMargin = marginVal;
+              if (exceedPoints.length < 500) {
+                exceedPoints.push({ frequency: f, intensity: s.intensity[i] });
+              }
+            }
+          }
+          return {
+            ...s,
+            limit: { exceedances, maxMargin },
+            exceedPoints
+          };
+        });
+        return { series: updated, limitActive: true };
+      }
+
+      function setBands(newBands) {
+        bands = newBands;
+        renderBandList();
+        refreshPlots();
+      }
+
+      function renderBandList() {
+        if (!bands.length) {
+          bandListEl.innerHTML = "<span class=\"status\">Nenhuma banda definida.</span>";
+          return;
+        }
+        bandListEl.innerHTML = bands.map((b, idx) => `
+          <span class="pill">${b.label} (${b.min} - ${b.max}) <button data-band="${idx}" class="secondary" style="margin-left:6px;">x</button></span>
+        `).join("");
+        bandListEl.querySelectorAll("button[data-band]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const index = parseInt(btn.getAttribute("data-band"), 10);
+            bands = bands.filter((_, i) => i !== index);
+            renderBandList();
+            refreshPlots();
+          });
+        });
+      }
+
+      function computeBandStats(series) {
+        if (!bands.length) return "";
+        let html = `<table class="band-table"><thead><tr><th>Banda</th>`;
+        series.forEach((s, idx) => {
+          html += `<th>${s.filename || `M${idx + 1}`}</th>`;
+        });
+        html += `</tr></thead><tbody>`;
+        bands.forEach(band => {
+          html += `<tr><td>${band.label} (${band.min}-${band.max})</td>`;
+          series.forEach(s => {
+            const values = [];
+            for (let i = 0; i < s.frequency.length; i++) {
+              const f = s.frequency[i];
+              if (f >= band.min && f <= band.max) values.push(s.intensity[i]);
+            }
+            if (values.length === 0) {
+              html += `<td>—</td>`;
+              return;
+            }
+            const stats = computeStats(values);
+            html += `<td>min ${stats.min.toFixed(1)}<br/>max ${stats.max.toFixed(1)}<br/>média ${stats.mean.toFixed(1)}</td>`;
+          });
+          html += `</tr>`;
+        });
+        html += `</tbody></table>`;
+        return html;
+      }
+
+      function updateBaselineOptions(series) {
+        const current = baselineSelect.value;
+        baselineSelect.innerHTML = "";
+        if (!series.length) return;
+        series.forEach((s, idx) => {
+          const opt = document.createElement("option");
+          opt.value = String(idx);
+          opt.textContent = s.filename || `Medição ${idx + 1}`;
+          baselineSelect.appendChild(opt);
+        });
+        if (current && parseInt(current, 10) < series.length) {
+          baselineSelect.value = current;
+        } else {
+          baselineSelect.value = "0";
+        }
+      }
+
+      function computeComparison(series) {
+        if (series.length < 2) {
+          comparisonEl.innerHTML = "<div class=\"status\">Selecione 2+ medições para comparar.</div>";
+          return;
+        }
+        const baseIndex = parseInt(baselineSelect.value || "0", 10);
+        const baseline = series[baseIndex];
+        if (!baseline) return;
+
+        const baseFreq = baseline.frequency;
+        const baseInt = baseline.intensity;
+        const rows = [];
+
+        series.forEach((s, idx) => {
+          if (idx === baseIndex) return;
+          const deltas = [];
+          for (let i = 0; i < baseFreq.length; i++) {
+            const f = baseFreq[i];
+            const val = interpolateAt(s.frequency, s.intensity, f);
+            if (val === null) continue;
+            deltas.push(val - baseInt[i]);
+          }
+          if (!deltas.length) return;
+          const stats = computeStats(deltas);
+          const rms = Math.sqrt(deltas.reduce((acc, v) => acc + v * v, 0) / deltas.length);
+          const maxAbs = Math.max(...deltas.map(d => Math.abs(d)));
+
+          const topPeaks = [...(s.peaks || [])]
+            .sort((a, b) => b.intensity - a.intensity)
+            .slice(0, 5)
+            .map(p => {
+            const baseVal = interpolateAt(baseline.frequency, baseline.intensity, p.frequency);
+            if (baseVal === null) return null;
+            const delta = p.intensity - baseVal;
+            return `${p.frequency.toFixed(1)}: ${delta.toFixed(1)} dB`;
+          }).filter(Boolean).join(", ");
+
+          rows.push(`
+            <tr>
+              <td>${s.filename || `Medição ${idx + 1}`}</td>
+              <td>${stats.min.toFixed(2)}</td>
+              <td>${stats.max.toFixed(2)}</td>
+              <td>${stats.mean.toFixed(2)}</td>
+              <td>${rms.toFixed(2)}</td>
+              <td>${maxAbs.toFixed(2)}</td>
+              <td>${topPeaks || "—"}</td>
+            </tr>
+          `);
+        });
+
+        if (!rows.length) {
+          comparisonEl.innerHTML = "<div class=\"status\">Sem dados suficientes para comparar.</div>";
+          return;
+        }
+
+        comparisonEl.innerHTML = `
+          <table class="band-table">
+            <thead>
+              <tr>
+                <th>Comparado com baseline</th>
+                <th>Delta min</th>
+                <th>Delta max</th>
+                <th>Delta médio</th>
+                <th>RMS</th>
+                <th>Max |delta|</th>
+                <th>Top picos (delta)</th>
+              </tr>
+            </thead>
+            <tbody>${rows.join("")}</tbody>
+          </table>
+        `;
+      }
+
+      function render2D(series) {
+        const traces = [];
+
+        updateLimitSeries();
+        series.forEach((s, idx) => {
+          const color = colors[idx % colors.length];
+          traces.push({
+            x: s.frequency,
+            y: s.intensity,
+            mode: "lines",
+            name: s.filename || `Medição ${idx + 1}`,
+            line: { color, width: 2 }
+          });
+
+          const peaks = s.peaks || [];
+          if (showPeaks.checked && peaks.length) {
+            traces.push({
+              x: peaks.map(p => p.frequency),
+              y: peaks.map(p => p.intensity),
+              mode: "markers",
+              name: `Picos - ${s.filename || `M${idx + 1}`}`,
+              marker: { color, size: 6, symbol: "circle-open" }
+            });
+          }
+
+          if (s.exceedPoints && s.exceedPoints.length) {
+            traces.push({
+              x: s.exceedPoints.map(p => p.frequency),
+              y: s.exceedPoints.map(p => p.intensity),
+              mode: "markers",
+              name: `Excedeu limite - ${s.filename || `M${idx + 1}`}`,
+              marker: { color: "#ff6b6b", size: 6, symbol: "x" }
+            });
+          }
+        });
+
+        if (limitEnabled.checked && limitSeries) {
+          const limitDecimated = decimateArray(
+            limitSeries.frequency,
+            limitSeries.intensity.map(v => v + (parseFloat(limitMargin.value || "0") || 0)),
+            Math.max(200, Math.min(20000, parseInt(maxPoints.value || "5000", 10)))
+          );
+          traces.push({
+            x: limitDecimated.xs,
+            y: limitDecimated.ys,
+            mode: "lines",
+            name: "Limite",
+            line: { color: "#ff6b6b", width: 2, dash: "dash" }
+          });
+        }
+
+        const layout = {
+          paper_bgcolor: "#151b23",
+          plot_bgcolor: "#151b23",
+          font: { color: "#e7edf3" },
+          xaxis: { title: "Frequência", gridcolor: "#1f2a36" },
+          yaxis: { title: "Intensidade (dBµV)", gridcolor: "#1f2a36" },
+          margin: { t: 10, l: 50, r: 20, b: 45 },
+          legend: { orientation: "h" }
+        };
+
+        Plotly.newPlot("plot2d", traces, layout, { responsive: true });
+      }
+
+      function resampleSeries(series, freqGrid) {
+        const xs = series.frequency;
+        const ys = series.intensity;
+        return freqGrid.map(f => {
+          const val = interpolateAt(xs, ys, f);
+          return val === null ? 0 : val;
+        });
+      }
+
+      function formatLabel(name, maxLen = 12) {
+        if (!name) return "Medição";
+        const base = name.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
+        if (base.length <= maxLen) return base;
+        return `${base.slice(0, maxLen - 1)}…`;
+      }
+
+      function render3D(series) {
+        const mode = mode3d.value;
+        const traces = [];
+        const tickvals = [];
+        const ticktext = [];
+
+        if (mode === "surface" && series.length > 1) {
+          const bins = Math.max(50, Math.min(800, parseInt(bins3d.value || "200", 10)));
+          const minFreq = Math.min(...series.map(s => s.frequency[0] || 0));
+          const maxFreq = Math.max(...series.map(s => s.frequency[s.frequency.length - 1] || 0));
+          const step = (maxFreq - minFreq) / (bins - 1);
+          const freqGrid = Array.from({ length: bins }, (_, i) => minFreq + i * step);
+          const z = series.map(s => resampleSeries(s, freqGrid));
+          const y = series.map((_, idx) => idx);
+          traces.push({
+            type: "surface",
+            x: freqGrid,
+            y,
+            z,
+            colorscale: "Viridis",
+            showscale: true
+          });
+          series.forEach((s, idx) => {
+            tickvals.push(idx);
+            ticktext.push(formatLabel(s.filename || `Medição ${idx + 1}`));
+          });
+        } else {
+          series.forEach((s, idx) => {
+            const color = colors[idx % colors.length];
+            const y = s.frequency.map(() => idx);
+            const label = formatLabel(s.filename || `Medição ${idx + 1}`);
+            traces.push({
+              type: "scatter3d",
+              mode: "lines",
+              x: s.frequency,
+              y,
+              z: s.intensity,
+              name: label,
+              line: { color, width: 3 },
+              hovertemplate: `${s.filename || label}<br>Freq: %{x:.2f}<br>Int: %{z:.2f} dBµV<extra></extra>`
+            });
+            tickvals.push(idx);
+            ticktext.push(label);
+          });
+        }
+
+        const layout = {
+          paper_bgcolor: "#151b23",
+          scene: {
+            xaxis: { title: "Frequência" },
+            yaxis: { title: "", tickvals, ticktext, tickfont: { size: 10 } },
+            zaxis: { title: "Intensidade (dBµV)" },
+            camera: { eye: { x: 1.4, y: 1.4, z: 0.9 } }
+          },
+          showlegend: true,
+          legend: { orientation: "h" },
+          margin: { t: 10, l: 10, r: 10, b: 10 },
+          font: { color: "#e7edf3" }
+        };
+
+        Plotly.newPlot("plot3d", traces, layout, { responsive: true });
+      }
+
+      function normalizeWindow(method, value) {
+        let windowValue = parseInt(value || "", 10);
+        if (Number.isNaN(windowValue) || windowValue <= 0) {
+          windowValue = method === "savgol" ? 11 : 5;
+        }
+        if (windowValue < 3) windowValue = 3;
+        if (method === "savgol" && windowValue % 2 === 0) windowValue += 1;
+        return windowValue;
+      }
+
+      function getFreqFilter() {
+        const min = parseFloat(freqMin.value);
+        const max = parseFloat(freqMax.value);
+        const hasMin = !Number.isNaN(min);
+        const hasMax = !Number.isNaN(max);
+        return {
+          min: hasMin ? min : null,
+          max: hasMax ? max : null,
+          active: hasMin || hasMax
+        };
+      }
+
+      function filterSeries(series) {
+        const filter = getFreqFilter();
+        if (!filter.active) return { series, filterActive: false };
+
+        const filteredSeries = series.map(s => {
+          const freq = [];
+          const inten = [];
+          for (let i = 0; i < s.frequency.length; i++) {
+            const f = s.frequency[i];
+            if ((filter.min === null || f >= filter.min) && (filter.max === null || f <= filter.max)) {
+              freq.push(f);
+              inten.push(s.intensity[i]);
+            }
+          }
+          const peaks = (s.peaks || []).filter(p => {
+            return (filter.min === null || p.frequency >= filter.min) &&
+              (filter.max === null || p.frequency <= filter.max);
+          });
+
+          const stats = computeStats(inten) || { min: 0, max: 0, mean: 0, std: 0 };
+          return {
+            ...s,
+            frequency: freq,
+            intensity: inten,
+            peaks,
+            stats,
+            count: freq.length
+          };
+        });
+
+        return { series: filteredSeries, filterActive: true };
+      }
+
+      function getProcessedSeries() {
+        const filtered = filterSeries(lastSeries);
+        const limited = applyLimit(filtered.series);
+        return {
+          series: limited.series,
+          filterActive: filtered.filterActive,
+          limitActive: limited.limitActive
+        };
+      }
+
+      function refreshPlots() {
+        if (!lastSeries.length) return;
+        updateLimitSeries();
+        const processed = getProcessedSeries();
+        const plotSeries = decimateSeries(processed.series);
+        render2D(plotSeries);
+        renderStats(processed.series, processed.filterActive, processed.limitActive);
+        renderPatterns(processed.series);
+        bandStatsEl.innerHTML = computeBandStats(processed.series);
+        updateBaselineOptions(processed.series);
+        computeComparison(processed.series);
+        if (show3d) render3D(plotSeries);
+      }
+
+      function applyPreset(preset) {
+        switch (preset) {
+          case "lowband":
+            smoothingMethod.value = "moving";
+            smoothingWindow.value = 9;
+            peakMinHeight.value = "";
+            peakMinDistance.value = 5;
+            maxPeaks.value = 200;
+            break;
+          case "highband":
+            smoothingMethod.value = "savgol";
+            smoothingWindow.value = 11;
+            peakMinHeight.value = "";
+            peakMinDistance.value = 10;
+            maxPeaks.value = 200;
+            break;
+          case "aggressive":
+            smoothingMethod.value = "none";
+            smoothingWindow.value = 7;
+            peakMinHeight.value = 5;
+            peakMinDistance.value = 3;
+            maxPeaks.value = 400;
+            break;
+          default:
+            break;
+        }
+      }
+
+      function buildQueryParams() {
+        const params = new URLSearchParams();
+        const method = smoothingMethod.value;
+        const windowValue = normalizeWindow(method, smoothingWindow.value);
+
+        smoothingWindow.value = windowValue;
+        params.set("smoothing", method);
+        params.set("smoothing_window", windowValue);
+
+        if (peakMinHeight.value) params.set("peak_min_height", peakMinHeight.value);
+        if (peakMinDistance.value) params.set("peak_min_distance", peakMinDistance.value);
+        if (maxPeaks.value) params.set("max_peaks", maxPeaks.value);
+        return params.toString();
+      }
+
+      function buildSummary(series) {
+        const timestamp = new Date().toISOString();
+        const lines = [];
+        lines.push(`WaveSight EMC POC - Relatório`);
+        lines.push(`Gerado em: ${timestamp}`);
+        lines.push("");
+        series.forEach((s, idx) => {
+          lines.push(`Medição ${idx + 1}: ${s.filename || "sem_nome"}`);
+          lines.push(`Amostras: ${s.count}`);
+          lines.push(`Min: ${s.stats.min.toFixed(2)} dBµV`);
+          lines.push(`Max: ${s.stats.max.toFixed(2)} dBµV`);
+          lines.push(`Média: ${s.stats.mean.toFixed(2)} dBµV`);
+          lines.push(`Desvio: ${s.stats.std.toFixed(2)} dBµV`);
+          if (s.smoothing && s.smoothing.method !== "none") {
+            lines.push(`Suavização: ${s.smoothing.method} (janela ${s.smoothing.window})`);
+          }
+          lines.push("");
+        });
+        return lines.join("\n");
+      }
+
+      function buildReportHtml(series, imageDataUrl) {
+        const timestamp = new Date().toLocaleString();
+        const rows = series.map((s, idx) => `
+          <tr>
+            <td>${s.filename || `Medição ${idx + 1}`}</td>
+            <td>${s.count}</td>
+            <td>${s.stats.min.toFixed(2)}</td>
+            <td>${s.stats.max.toFixed(2)}</td>
+            <td>${s.stats.mean.toFixed(2)}</td>
+            <td>${s.stats.std.toFixed(2)}</td>
+            <td>${s.smoothing && s.smoothing.method !== "none" ? `${s.smoothing.method} (${s.smoothing.window})` : "—"}</td>
+          </tr>
+        `).join("");
+
+        const params = {
+          "Suavização": smoothingMethod.value,
+          "Janela": smoothingWindow.value,
+          "Pico min (dBµV)": peakMinHeight.value || "—",
+          "Distância min": peakMinDistance.value || "—",
+          "Máx picos": maxPeaks.value,
+          "Freq min": freqMin.value || "—",
+          "Freq max": freqMax.value || "—",
+          "Mostrar picos": showPeaks.checked ? "sim" : "não",
+          "Fonte limite": limitSource.value,
+          "Curva limite": limitEnabled.checked ? (limitFilename || "ativa") : "não",
+          "Norma": normSelect.value !== "none" ? (normSelect.options[normSelect.selectedIndex]?.textContent || normSelect.value) : "—",
+          "Classe": normClass.value || "—",
+          "Faixa": normBand.options[normBand.selectedIndex]?.textContent || "—",
+          "Margem limite (dB)": limitMargin.value || "0",
+          "Bandas": bands.length ? bands.map(b => `${b.label} (${b.min}-${b.max})`).join(", ") : "—",
+          "3D modo": mode3d.value,
+          "3D bins": bins3d.value,
+          "Max pontos no gráfico": maxPoints.value
+        };
+
+        const paramRows = Object.entries(params).map(([key, value]) => `
+          <tr><td>${key}</td><td>${value}</td></tr>
+        `).join("");
+
+        const patternRows = series.map((s, idx) => {
+          const patterns = s.patterns || {};
+          const harmonics = patterns.harmonics;
+          const spacing = patterns.spacing;
+          if (!harmonics && !spacing) return "";
+          return `
+            <tr>
+              <td>${s.filename || `Medição ${idx + 1}`}</td>
+              <td>${harmonics ? harmonics.fundamental.toFixed(2) : "—"}</td>
+              <td>${harmonics ? harmonics.count : "—"}</td>
+              <td>${spacing ? spacing.delta.toFixed(2) : "—"}</td>
+              <td>${spacing ? spacing.count : "—"}</td>
+            </tr>
+          `;
+        }).filter(Boolean).join("");
+
+        const bandHtml = computeBandStats(series);
+
+        const legend = series.map((s, idx) => `
+          <span style="display:inline-flex;align-items:center;gap:6px;margin-right:12px;">
+            <span style="width:10px;height:10px;background:${colors[idx % colors.length]};display:inline-block;border-radius:2px;"></span>
+            ${s.filename || `Medição ${idx + 1}`}
+          </span>
+        `).join("");
+
+        const filesLine = series.map(s => s.filename || "sem_nome").join(", ");
+        return `
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <title>WaveSight EMC - Relatório</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+      h1 { margin: 0 0 6px; font-size: 22px; }
+      .meta { color: #444; margin-bottom: 16px; }
+      .section { margin-top: 18px; }
+      table { border-collapse: collapse; width: 100%; font-size: 12px; }
+      th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+      th { background: #f2f2f2; }
+      img { max-width: 100%; border: 1px solid #ddd; margin-top: 8px; }
+      .footer { margin-top: 18px; font-size: 11px; color: #666; }
+      .cover {
+        border: 1px solid #ddd;
+        padding: 24px;
+        display: grid;
+        gap: 10px;
+      }
+      .cover h1 { font-size: 26px; margin: 0; }
+      .cover .subtitle { color: #444; }
+      .page-break { page-break-after: always; }
+      @media print {
+        .page-break { page-break-after: always; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="cover">
+      <h1>WaveSight EMC — Relatório</h1>
+      <div class="subtitle">Compatibilidade Eletromagnética (EMC)</div>
+      <div>Gerado em: ${timestamp}</div>
+      <div>Arquivos: ${filesLine}</div>
+      <div>Total de medições: ${series.length}</div>
+    </div>
+    <div class="page-break"></div>
+    <h1>Resumo Técnico</h1>
+    <div class="meta">Parâmetros e resultados consolidados</div>
+    <div class="section">
+      <strong>Resumo das medições</strong>
+      <table>
+        <thead>
+          <tr>
+            <th>Arquivo</th>
+            <th>Amostras</th>
+            <th>Min (dBµV)</th>
+            <th>Max (dBµV)</th>
+            <th>Média (dBµV)</th>
+            <th>Desvio</th>
+            <th>Suavização</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="section">
+      <strong>Parâmetros usados</strong>
+      <table>
+        <thead><tr><th>Parâmetro</th><th>Valor</th></tr></thead>
+        <tbody>${paramRows}</tbody>
+      </table>
+    </div>
+    ${legend ? `
+    <div class="section">
+      <strong>Legenda</strong>
+      <div>${legend}</div>
+    </div>` : ""}
+    ${patternRows ? `
+    <div class="section">
+      <strong>Padrões detectados</strong>
+      <table>
+        <thead>
+          <tr>
+            <th>Arquivo</th>
+            <th>Fundamental</th>
+            <th>Harmônicos</th>
+            <th>Espaçamento</th>
+            <th>Ocorrências</th>
+          </tr>
+        </thead>
+        <tbody>${patternRows}</tbody>
+      </table>
+    </div>` : ""}
+    ${bandHtml ? `
+    <div class="section">
+      <strong>Bandas</strong>
+      ${bandHtml}
+    </div>` : ""}
+    <div class="section">
+      <strong>Gráfico</strong>
+      <img src="${imageDataUrl}" alt="Grafico 2D" />
+    </div>
+    <div class="footer">WaveSight EMC POC</div>
+  </body>
+</html>
+        `.trim();
+      }
+
+      async function downloadReport() {
+        if (!lastSeries.length) return;
+        try {
+          const width = parseInt(exportWidth.value || "1600", 10);
+          const height = parseInt(exportHeight.value || "900", 10);
+          const dataUrl = await Plotly.toImage("plot2d", {
+            format: "png",
+            width,
+            height
+          });
+          const processed = getProcessedSeries();
+          const html = buildReportHtml(processed.series, dataUrl);
+          downloadBlob("wavesight-relatorio.html", html, "text/html;charset=utf-8");
+          downloadAttachments(processed.series);
+        } catch (err) {
+          setStatus("Falha ao gerar relatório", "error");
+        }
+      }
+
+      async function printReportPdf() {
+        if (!lastSeries.length) return;
+        try {
+          const width = parseInt(exportWidth.value || "1600", 10);
+          const height = parseInt(exportHeight.value || "900", 10);
+          const dataUrl = await Plotly.toImage("plot2d", {
+            format: "png",
+            width,
+            height
+          });
+          const processed = getProcessedSeries();
+          const html = buildReportHtml(processed.series, dataUrl);
+          const reportWindow = window.open("", "_blank");
+          if (!reportWindow) {
+            setStatus("Pop-up bloqueado pelo navegador", "error");
+            return;
+          }
+          reportWindow.document.write(html);
+          reportWindow.document.close();
+          reportWindow.focus();
+          reportWindow.print();
+        } catch (err) {
+          setStatus("Falha ao gerar PDF", "error");
+        }
+      }
+
+      async function exportImage() {
+        if (!lastSeries.length) return;
+        try {
+          const width = parseInt(exportWidth.value || "1600", 10);
+          const height = parseInt(exportHeight.value || "900", 10);
+          const theme = exportTheme.value;
+
+          const darkLayout = {
+            paper_bgcolor: "#151b23",
+            plot_bgcolor: "#151b23",
+            font: { color: "#e7edf3" },
+            xaxis: { gridcolor: "#1f2a36" },
+            yaxis: { gridcolor: "#1f2a36" }
+          };
+          const lightLayout = {
+            paper_bgcolor: "#ffffff",
+            plot_bgcolor: "#ffffff",
+            font: { color: "#111111" },
+            xaxis: { gridcolor: "#dddddd" },
+            yaxis: { gridcolor: "#dddddd" }
+          };
+
+          if (theme === "light") {
+            await Plotly.relayout("plot2d", lightLayout);
+          } else {
+            await Plotly.relayout("plot2d", darkLayout);
+          }
+
+          const dataUrl = await Plotly.toImage("plot2d", {
+            format: "png",
+            width,
+            height
+          });
+          downloadDataUrl("wavesight-export.png", dataUrl);
+
+          // Restore dark theme in UI
+          await Plotly.relayout("plot2d", darkLayout);
+        } catch (err) {
+          setStatus("Falha ao exportar imagem", "error");
+        }
+      }
+
+      async function upload() {
+        if (!authToken) {
+          setStatus("Faca login para processar arquivos.", "error");
+          return;
+        }
+        const files = Array.from(fileInput.files || []);
+        if (!files.length) {
+          setStatus("Selecione pelo menos um CSV.", "error");
+          return;
+        }
+
+        setStatus("Processando...", "loading");
+        setLoading(true);
+        btnUpload.disabled = true;
+        btn3d.disabled = true;
+        btnReport.disabled = true;
+        btnReportPdf.disabled = true;
+
+        try {
+          const form = new FormData();
+          files.forEach(file => form.append("files", file));
+
+          const query = buildQueryParams();
+          const res = await fetch(`${API_URL}/upload-multi?${query}`, {
+            method: "POST",
+            headers: {
+              ...getAuthHeaders()
+            },
+            body: form
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || "Erro ao processar CSV");
+          }
+
+          const payload = await res.json();
+          const series = payload.series ? payload.series : [payload];
+          lastSeries = series;
+
+          if (limitPreset.value && limitPreset.value !== "none") {
+            applyLimitPreset();
+          } else {
+            refreshPlots();
+          }
+          setStatus("OK", "ok");
+          btn3d.disabled = false;
+          btnReport.disabled = false;
+          btnReportPdf.disabled = false;
+        } catch (err) {
+          setStatus(err.message || "Erro inesperado", "error");
+        } finally {
+          btnUpload.disabled = false;
+          setLoading(false);
+        }
+      }
+
+      btnUpload.addEventListener("click", upload);
+      btnRegister.addEventListener("click", registerUser);
+      btnLogin.addEventListener("click", loginUser);
+      btnLogout.addEventListener("click", logoutUser);
+      authPassword.addEventListener("keydown", event => {
+        if (event.key === "Enter") loginUser();
+      });
+      btnReport.addEventListener("click", downloadReport);
+      btnReportPdf.addEventListener("click", printReportPdf);
+      btnExportImage.addEventListener("click", exportImage);
+      btn3d.addEventListener("click", () => {
+        if (!lastSeries.length) return;
+        show3d = !show3d;
+        panel3d.style.display = show3d ? "block" : "none";
+        if (show3d) refreshPlots();
+      });
+      presetSelect.addEventListener("change", () => applyPreset(presetSelect.value));
+      showPeaks.addEventListener("change", refreshPlots);
+      maxPoints.addEventListener("change", refreshPlots);
+      baselineSelect.addEventListener("change", refreshPlots);
+      [freqMin, freqMax].forEach(input => {
+        input.addEventListener("change", () => {
+          refreshPlots();
+        });
+      });
+      limitInput.addEventListener("change", () => {
+        const file = limitInput.files && limitInput.files[0];
+        if (file) loadLimitFile(file);
+      });
+      normFile.addEventListener("change", () => {
+        const file = normFile.files && normFile.files[0];
+        if (file) loadNormFile(file);
+      });
+      limitSource.addEventListener("change", () => {
+        if (limitSource.value === "none") {
+          limitEnabled.checked = false;
+          limitSeries = null;
+          limitFilename = null;
+        } else {
+          limitEnabled.checked = true;
+        }
+        updateLimitSourceUI();
+        refreshPlots();
+      });
+      limitPreset.addEventListener("change", applyLimitPreset);
+      normSelect.addEventListener("change", () => {
+        refreshClassOptions();
+        applyLimitNorm();
+      });
+      normClass.addEventListener("change", () => {
+        refreshBandOptions();
+        applyLimitNorm();
+      });
+      normBand.addEventListener("change", applyLimitNorm);
+      limitEnabled.addEventListener("change", refreshPlots);
+      limitMargin.addEventListener("change", refreshPlots);
+      bandPreset.addEventListener("change", () => {
+        switch (bandPreset.value) {
+          case "basic":
+            setBands([
+              { label: "Baixa", min: 0, max: 30 },
+              { label: "Média", min: 30, max: 300 },
+              { label: "Alta", min: 300, max: 1000 }
+            ]);
+            break;
+          case "wide":
+            setBands([
+              { label: "0-100", min: 0, max: 100 },
+              { label: "100-1000", min: 100, max: 1000 }
+            ]);
+            break;
+          default:
+            setBands([]);
+        }
+      });
+      btnAddBand.addEventListener("click", () => {
+        const min = parseFloat(bandMin.value);
+        const max = parseFloat(bandMax.value);
+        if (Number.isNaN(min) || Number.isNaN(max) || max <= min) {
+          setStatus("Banda inválida", "error");
+          return;
+        }
+        const label = `Custom ${bands.length + 1}`;
+        bands = [...bands, { label, min, max }];
+        renderBandList();
+        refreshPlots();
+      });
+      mode3d.addEventListener("change", () => {
+        if (show3d) refreshPlots();
+      });
+      bins3d.addEventListener("change", () => {
+        if (show3d) refreshPlots();
+      });
+      btnClear.addEventListener("click", () => {
+        fileInput.value = "";
+        fileList.innerHTML = "";
+        lastSeries = [];
+        limitSeries = null;
+        limitFilename = null;
+        limitFileSeries = null;
+        limitFileName = null;
+        limitPresetSeries = null;
+        limitPresetName = null;
+        limitNormSeries = null;
+        limitNormName = null;
+        limitInput.value = "";
+        limitPreset.value = "none";
+        limitSource.value = "none";
+        limitEnabled.checked = false;
+        updateLimitSourceUI();
+        bands = [];
+        renderBandList();
+        patternsEl.innerHTML = "";
+        bandStatsEl.innerHTML = "";
+        statsEl.innerHTML = "";
+        setStatus("", "loading");
+        btn3d.disabled = true;
+        btnReport.disabled = true;
+        btnReportPdf.disabled = true;
+        Plotly.newPlot("plot2d", [], { paper_bgcolor: "#151b23", plot_bgcolor: "#151b23" }, { responsive: true });
+        if (show3d) Plotly.newPlot("plot3d", [], { paper_bgcolor: "#151b23" }, { responsive: true });
+      });
+
+      function updateFileList() {
+        const files = Array.from(fileInput.files || []);
+        if (!files.length) {
+          fileList.innerHTML = "";
+          return;
+        }
+        fileList.innerHTML = files.map(file => `<span class="file-chip">${file.name}</span>`).join("");
+      }
+
+      fileInput.addEventListener("change", updateFileList);
+      dropzone.addEventListener("dragover", event => {
+        event.preventDefault();
+        dropzone.classList.add("dragover");
+      });
+      dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+      dropzone.addEventListener("drop", event => {
+        event.preventDefault();
+        dropzone.classList.remove("dragover");
+        if (event.dataTransfer?.files?.length) {
+          fileInput.files = event.dataTransfer.files;
+          updateFileList();
+        }
+      });
+
+      refreshNormSelectors();
+      updateLimitSourceUI();
+      renderBandList();
+      loadCurrentUser();
+      Plotly.newPlot("plot2d", [], { paper_bgcolor: "#151b23", plot_bgcolor: "#151b23" }, { responsive: true });
+    </script>
+  </body>
+</html>
