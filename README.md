@@ -1,17 +1,19 @@
 # WaveSight EMC POC
 
-POC para upload de CSV (frequencia x intensidade em dBuV), processamento em Python e visualizacao 2D/3D no navegador.
+POC para upload de CSV (frequência x intensidade em dBµV), processamento em Python e visualização 2D/3D no navegador.
 
 ## Estrutura
-- `api/` Backend FastAPI
-- `frontend/` HTML/JS com Plotly
-- `scripts/` Scripts PowerShell
-- `docker-compose.yml` Stack dockerizada (`frontend + api + postgres`)
+- `api/` — Backend FastAPI (Python)
+- `frontend/` — HTML/JS com Plotly (servido por nginx)
+- `contexts/` — Context pack para continuidade entre chats/IAs
+- `scripts/` — Scripts PowerShell auxiliares
+- `samples/` — CSVs de exemplo e normas JSON
+- `docker-compose.yml` — Stack dockerizada (`frontend + api + postgres`)
+- `INPUT_CONTRACT.md` — Contrato de entrada v1 (campos obrigatórios/opcionais)
 
 ## Rodando com Docker (recomendado)
-```powershell
-cd c:\Users\eduardo\Documents\wavesight
-# opcional: Copy-Item .env.example .env
+```bash
+# Clone e entre no diretório do projeto
 docker compose up --build
 ```
 
@@ -19,19 +21,20 @@ Acessos:
 - Frontend: `http://localhost:8080`
 - API (direto): `http://localhost:8000`
 - API via frontend proxy: `http://localhost:8080/api`
+- Health check: `GET http://localhost:8000/health`
 
 Parar stack:
-```powershell
+```bash
 docker compose down
 ```
 
-Resetar tambem o volume do banco:
-```powershell
+Resetar também o volume do banco:
+```bash
 docker compose down -v
 ```
 
-## Autenticacao
-Agora o uso do processamento exige login.
+## Autenticação
+O uso do processamento exige login.
 
 Endpoints:
 - `POST /auth/register`
@@ -69,34 +72,36 @@ Resposta (register/login):
 ```
 
 ## Recursos no frontend
-- Login e cadastro de usuarios
-- Upload multiplo de CSV e overlay das medicoes
-- Curva de referencia (limite) via CSV, presets e normas (exemplo)
+- Login e cadastro de usuários
+- Upload múltiplo de CSV e overlay das medições
+- Seleção explícita de até 3 arquivos por eixos (X/Y/Z)
+- Curva de referência (limite) via CSV, presets e normas (exemplo)
 - Presets e filtros de faixa
-- Relatorio HTML/PDF
-- 3D em linhas ou superficie (waterfall)
-- Comparacao automatica entre medicoes
-- Exportacao de imagem com resolucao/tema
+- Relatório HTML/PDF
+- Relatório no formato JLR RE310 (Tabela 7-2) com avaliação automática por banda (PASS/FAIL)
+- 3D em linhas ou superfície (waterfall)
+- Comparação automática entre medições
+- Exportação de imagem com resolução/tema
 
 ## Endpoints de processamento
-- `POST /upload` (um CSV) - protegido por token
-- `POST /upload-multi` (varios CSVs) - protegido por token
+- `POST /upload` (um CSV) — protegido por token
+- `POST /upload-multi` (vários CSVs) — protegido por token
 
-Parametros (query):
+Parâmetros (query):
 - `smoothing`: `none` | `moving` | `savgol`
 - `smoothing_window`: tamanho da janela
-- `peak_min_height`: limiar minimo do pico
-- `peak_min_distance`: distancia minima entre picos (em amostras)
-- `max_peaks`: maximo de picos retornados
+- `peak_min_height`: limiar mínimo do pico
+- `peak_min_distance`: distância mínima entre picos (em amostras)
+- `max_peaks`: máximo de picos retornados
 
 ## Formato do CSV
-- Duas colunas: frequencia e intensidade (dBuV)
-- Cabecalho opcional
-- Delimitador automatico (virgula, ponto e virgula, tab)
+- Duas colunas: frequência e intensidade (dBµV)
+- Cabeçalho opcional
+- Delimitador automático (vírgula, ponto e vírgula, tab)
 - Curva de limite usa o mesmo formato (freq, limite)
 
 ## Normas (JSON)
-Voce pode carregar tabelas de normas via `Norma JSON` no frontend.
+Você pode carregar tabelas de normas via `Norma JSON` no frontend.
 
 Estrutura esperada (exemplo simplificado):
 ```json
@@ -115,5 +120,15 @@ Estrutura esperada (exemplo simplificado):
 }
 ```
 
-Obs: os presets embutidos sao apenas exemplos. Para tabelas oficiais, carregue JSON licenciado.
+Obs: os presets embutidos são apenas exemplos. Para tabelas oficiais, carregue JSON licenciado.
 Exemplo: `samples/norms_example.json`.
+
+## Desenvolvimento local (sem Docker)
+O `Makefile` tem targets `venv`, `install`, `run` e `test-upload` — configurado para Windows.
+Para Linux, rode diretamente:
+```bash
+python -m venv api/.venv
+source api/.venv/bin/activate
+pip install -r api/requirements.txt
+uvicorn api.main:app --reload --port 8000
+```

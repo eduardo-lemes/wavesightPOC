@@ -1,573 +1,727 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="pt-br">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>WaveSight EMC POC</title>
     <script src="https://cdn.plot.ly/plotly-2.27.1.min.js"></script>
-    <style>
-      :root {
-        --bg: #0f141a;
-        --panel: #151b23;
-        --accent: #57d6ff;
-        --text: #e7edf3;
-        --muted: #96a3ad;
-        --border: #1f2a36;
-        --chip: #0f1f2c;
-        color-scheme: dark;
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: "IBM Plex Sans", system-ui, sans-serif;
-        background: radial-gradient(1200px 600px at 20% 10%, #1b2635 0%, #0f141a 50%, #0b0f14 100%);
-        color: var(--text);
-      }
-      header {
-        padding: 24px 28px;
-        border-bottom: 1px solid var(--border);
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-      }
-      h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: 0.4px; }
-      p { margin: 0; color: var(--muted); }
-      .title-block { display: grid; gap: 4px; }
-      .session-box {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-      }
-      .auth-status {
-        color: var(--muted);
-        font-size: 12px;
-      }
-      .auth-status.error { color: #ff8f8f; }
-      .auth-status.ok { color: #7fe0a2; }
-      .auth-overlay {
-        position: fixed;
-        inset: 0;
-        z-index: 20;
-        background: linear-gradient(160deg, rgba(8, 12, 18, 0.9) 0%, rgba(8, 12, 18, 0.74) 100%);
-        backdrop-filter: blur(6px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-      }
-      .auth-card {
-        width: min(460px, 100%);
-        background: linear-gradient(160deg, #141c26 0%, #10161e 100%);
-        border: 1px solid #2b3b4f;
-        border-radius: 14px;
-        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
-        padding: 22px;
-        display: grid;
-        gap: 14px;
-      }
-      .auth-card h2 {
-        margin: 0;
-        font-size: 22px;
-        letter-spacing: 0.2px;
-      }
-      .auth-subtitle {
-        margin: 0;
-        color: var(--muted);
-        font-size: 13px;
-      }
-      .auth-field {
-        display: grid;
-        gap: 6px;
-      }
-      .auth-field label {
-        color: var(--muted);
-        font-size: 12px;
-      }
-      .auth-field input {
-        width: 100%;
-        background: #0f151d;
-        color: var(--text);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        outline: none;
-        padding: 10px 12px;
-      }
-      .auth-field input:focus {
-        border-color: var(--accent);
-      }
-      .auth-actions {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-      .user-badge {
-        background: #0f1f2c;
-        border: 1px solid var(--border);
-        color: var(--text);
-        border-radius: 999px;
-        padding: 6px 10px;
-        font-size: 12px;
-      }
-      .container {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 16px;
-        padding: 20px 28px 40px;
-      }
-      body.auth-locked .container,
-      body.auth-locked header {
-        filter: blur(2px);
-        pointer-events: none;
-        user-select: none;
-      }
-      .panel {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 16px;
-      }
-      .controls {
-        display: grid;
-        gap: 10px;
-      }
-      .control-row {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        flex-wrap: wrap;
-      }
-      .dropzone {
-        position: relative;
-        border: 1px dashed var(--border);
-        border-radius: 10px;
-        padding: 12px;
-        background: #0c1219;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-      .dropzone.dragover {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 2px rgba(87, 214, 255, 0.15);
-      }
-      .dropzone input[type="file"] {
-        position: absolute;
-        inset: 0;
-        opacity: 0;
-        cursor: pointer;
-      }
-      .dropzone-text {
-        display: grid;
-        gap: 4px;
-        font-size: 13px;
-        color: var(--muted);
-      }
-      .file-list {
-        font-size: 12px;
-        color: var(--text);
-        display: grid;
-        gap: 4px;
-      }
-      .file-chip {
-        background: #0f1f2c;
-        border: 1px solid var(--border);
-        padding: 4px 8px;
-        border-radius: 999px;
-        display: inline-flex;
-        gap: 6px;
-        align-items: center;
-      }
-      .section-title {
-        font-size: 13px;
-        letter-spacing: 0.4px;
-        color: var(--muted);
-        text-transform: uppercase;
-        margin-bottom: 10px;
-      }
-      .pill-list { display: flex; gap: 8px; flex-wrap: wrap; }
-      .pill {
-        background: #0f1f2c;
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        padding: 6px 10px;
-        font-size: 12px;
-        color: var(--text);
-      }
-      .pill button {
-        background: transparent;
-        border: none;
-        color: var(--muted);
-        cursor: pointer;
-        font-size: 12px;
-        padding: 0 4px;
-      }
-      .control {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: #0f151d;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 6px 10px;
-      }
-      .control input[type="checkbox"] {
-        width: 16px;
-        height: 16px;
-      }
-      .control label {
-        font-size: 12px;
-        color: var(--muted);
-      }
-      input[type="file"] { color: var(--muted); }
-      input[type="number"], select {
-        background: #0f151d;
-        color: var(--text);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        outline: none;
-        min-width: 70px;
-        padding: 4px 8px;
-      }
-      select {
-        appearance: none;
-        padding-right: 26px;
-        background-image:
-          linear-gradient(45deg, transparent 50%, var(--muted) 50%),
-          linear-gradient(135deg, var(--muted) 50%, transparent 50%),
-          linear-gradient(to right, transparent, transparent);
-        background-position:
-          calc(100% - 16px) 55%,
-          calc(100% - 11px) 55%,
-          0 0;
-        background-size: 5px 5px, 5px 5px, 100% 100%;
-        background-repeat: no-repeat;
-      }
-      select:focus, input[type="number"]:focus {
-        border-color: var(--accent);
-      }
-      select option {
-        background-color: #0f151d;
-        color: var(--text);
-      }
-      button {
-        background: var(--accent);
-        border: none;
-        color: #081018;
-        padding: 10px 14px;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-      }
-      button.secondary {
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text);
-      }
-      button:disabled { opacity: 0.6; cursor: not-allowed; }
-      .toggle { background: transparent; border: 1px solid var(--border); color: var(--text); }
-      .status { color: var(--muted); font-size: 14px; }
-      .status.ok { color: #6ddf7a; }
-      .status.error { color: #ff6b6b; }
-      .status.loading { color: var(--muted); }
-      .spinner {
-        width: 12px;
-        height: 12px;
-        border: 2px solid var(--border);
-        border-top-color: var(--accent);
-        border-radius: 50%;
-        display: inline-block;
-        animation: spin 0.8s linear infinite;
-        margin-left: 6px;
-      }
-      .hidden { display: none; }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-      .stats { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-      .stat-card {
-        background: var(--chip);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 10px 12px;
-        font-size: 13px;
-        color: var(--muted);
-      }
-      .stat-card strong { color: var(--text); }
-      .pattern-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-      .pattern-card {
-        background: #0f1f2c;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 10px 12px;
-        font-size: 12px;
-        color: var(--muted);
-      }
-      .band-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-      .band-table th, .band-table td {
-        border: 1px solid var(--border);
-        padding: 6px 8px;
-        text-align: left;
-      }
-      .band-table th { background: #0f1f2c; color: var(--muted); }
-      .plot { width: 100%; height: 420px; }
-      .plot-3d { width: 100%; height: 520px; }
-      a { color: var(--accent); }
-      @media (max-width: 860px) {
-        header {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-      }
-    </style>
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="auth-locked">
-    <header>
-      <div class="title-block">
-        <h1>WaveSight EMC POC</h1>
-        <p>Upload de CSV com frequência x intensidade (dBµV) e visualização interativa.</p>
-      </div>
-      <div class="session-box">
-        <span id="userBadge" class="user-badge hidden"></span>
-        <button id="btnLogout" class="secondary hidden" disabled>Sair</button>
-      </div>
-    </header>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegação">
+        <div class="sidebar-brand">
+          <picture>
+            <source srcset="assets/logo.png" type="image/png" />
+            <img src="assets/logo.png" alt="WaveSight" loading="eager" />
+          </picture>
+        </div>
+        <nav class="nav">
+          <a href="#" data-view="dashboard" class="nav-view-link"><span class="dot" aria-hidden="true"></span>Início</a>
+          <a href="#" data-view="tool" class="nav-view-link"><span class="dot" aria-hidden="true"></span>Upload & Análise</a>
+          <a href="#" data-view="reports" class="nav-view-link"><span class="dot" aria-hidden="true"></span>Relatórios</a>
+          <a href="#" data-view="projects" class="nav-view-link"><span class="dot" aria-hidden="true"></span>Projetos</a>
+          <a href="#" data-view="settings" class="nav-view-link"><span class="dot" aria-hidden="true"></span>Configurações</a>
+        </nav>
+
+        <div class="sidebar-section" id="sidebarProjectsSection">
+          <div class="sidebar-section-title">Projetos</div>
+          <ul class="sidebar-list" id="sidebarProjectsList"><li class="empty">Nenhum projeto</li></ul>
+          <button class="sidebar-add-btn" id="btnNewProject" type="button">+ Novo projeto</button>
+        </div>
+
+        <div class="sidebar-section" id="sidebarAnalysesSection">
+          <div class="sidebar-section-title">Análises salvas</div>
+          <ul class="sidebar-list" id="sidebarAnalysesList"><li class="empty">Nenhuma análise</li></ul>
+          <button class="sidebar-add-btn" id="btnSaveAnalysis" type="button">💾 Salvar análise atual</button>
+        </div>
+      </aside>
+      <div class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <h1>WaveSight</h1>
+            <p>Upload e análise de medições (CSV) com visualização 2D/3D.</p>
+          </div>
+          <div class="session-box">
+            <span id="userBadge" class="user-badge hidden"></span>
+            <button id="btnLogout" class="secondary hidden" disabled>Sair</button>
+          </div>
+        </header>
+        <div class="content">
+
+          <!-- Dashboard Home -->
+          <div class="dashboard" id="dashboardHome">
+            <div class="dash-welcome">
+              <h2>Olá, <span id="dashUserName">—</span> 👋</h2>
+              <p>Bem-vindo ao WaveSight. Escolha uma opção para começar.</p>
+            </div>
+
+            <div class="dash-stats">
+              <div class="dash-stat"><div class="stat-val" id="dashStatProjects">0</div><div class="stat-label">Projetos</div></div>
+              <div class="dash-stat"><div class="stat-val" id="dashStatAnalyses">0</div><div class="stat-label">Análises</div></div>
+              <div class="dash-stat"><div class="stat-val" id="dashStatAi">—</div><div class="stat-label">IA</div></div>
+            </div>
+
+            <div class="dash-cards">
+              <div class="dash-card c-upload" data-goto="upload">
+                <div class="card-icon">📤</div>
+                <div class="card-title">Upload & Análise</div>
+                <div class="card-desc">Envie CSVs de medição e visualize picos, bandas e padrões em 2D/3D.</div>
+              </div>
+              <div class="dash-card c-projects" data-goto="projects">
+                <div class="card-icon">📁</div>
+                <div class="card-title">Projetos</div>
+                <div class="card-desc">Organize suas análises em campanhas e projetos de teste.</div>
+              </div>
+              <div class="dash-card c-reports" data-goto="reports">
+                <div class="card-icon">📋</div>
+                <div class="card-title">Relatórios</div>
+                <div class="card-desc">Consulte, reprocesse ou exclua relatórios de análises gerados.</div>
+              </div>
+              <div class="dash-card c-ai" data-goto="aiInsightsSection">
+                <div class="card-icon">🤖</div>
+                <div class="card-title">IA Insights</div>
+                <div class="card-desc">Diagnósticos automáticos por inteligência artificial com classificação de emissão.</div>
+              </div>
+              <div class="dash-card c-settings" data-goto="settings">
+                <div class="card-icon">⚙️</div>
+                <div class="card-title">Configurações</div>
+                <div class="card-desc">Idioma, preferências de visualização e informações do sistema.</div>
+              </div>
+              <div class="dash-card c-demo" data-goto="demo">
+                <div class="card-icon">🎮</div>
+                <div class="card-title">Modo Demo</div>
+                <div class="card-desc">Explore a plataforma com dados de exemplo, sem precisar de arquivos.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Projetos View -->
+          <div class="view" id="viewProjects">
+            <div class="proj-header">
+              <h2>📁 Projetos</h2>
+              <button class="proj-btn-new" id="btnNewProjectView" type="button">+ Novo projeto</button>
+            </div>
+            <div id="projectsGrid" class="proj-grid"></div>
+            <div id="projectDetail" class="proj-detail" style="display:none;"></div>
+          </div>
+
+          <!-- Configurações View -->
+          <div class="view" id="viewSettings">
+            <h2>⚙️ Configurações</h2>
+            <div class="settings-sections">
+              <div class="settings-card">
+                <div class="settings-card-title">👤 Perfil</div>
+                <div class="settings-row">
+                  <div class="settings-field">
+                    <label>Nome</label>
+                    <input type="text" id="settProfileName" disabled />
+                  </div>
+                  <div class="settings-field">
+                    <label>Email</label>
+                    <input type="text" id="settProfileEmail" disabled />
+                  </div>
+                </div>
+              </div>
+              <div class="settings-card">
+                <div class="settings-card-title">🌐 Preferências</div>
+                <div class="settings-row">
+                  <div class="settings-field">
+                    <label>Idioma</label>
+                    <select id="settLang">
+                      <option value="pt" selected>🇧🇷 Português</option>
+                      <option value="en">🇺🇸 English</option>
+                      <option value="es">🇪🇸 Español</option>
+                    </select>
+                    <span class="hint">Interface multilíngue (em breve)</span>
+                  </div>
+                  <div class="settings-field">
+                    <label>Tema</label>
+                    <select id="settTheme">
+                      <option value="dark" selected>🌙 Escuro</option>
+                      <option value="light" disabled>☀️ Claro (em breve)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="settings-card">
+                <div class="settings-card-title">🤖 Inteligência Artificial</div>
+                <div class="settings-row">
+                  <div class="settings-field">
+                    <label>Provider</label>
+                    <input type="text" id="settAiProvider" value="Não configurado" disabled />
+                    <span class="hint">Configurável no servidor: AI_PROVIDER, AI_API_KEY</span>
+                  </div>
+                  <div class="settings-field">
+                    <label>Modelo</label>
+                    <input type="text" id="settAiModel" value="—" disabled />
+                  </div>
+                  <div class="settings-field">
+                    <label>Status</label>
+                    <input type="text" id="settAiStatus" value="Desativado" disabled />
+                  </div>
+                </div>
+              </div>
+              <div class="settings-card">
+                <div class="settings-card-title">💻 Sistema</div>
+                <div class="settings-info">
+                  <dt>Versão</dt><dd>WaveSight EMC v1.0.0</dd>
+                  <dt>Backend</dt><dd>FastAPI + Python 3.12</dd>
+                  <dt>Banco</dt><dd>PostgreSQL 16</dd>
+                  <dt>Storage</dt><dd id="settStorage">Local (S3 não configurado)</dd>
+                  <dt>API Docs</dt><dd><a href="/api/docs" target="_blank">Swagger UI ↗</a></dd>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Relatórios View -->
+          <div class="view" id="viewReports">
+            <div class="reports-header">
+              <h2>📋 Relatórios</h2>
+              <span style="font-size:11px;color:var(--muted)">Gerados automaticamente após cada upload</span>
+            </div>
+            <div class="reports-toolbar">
+              <input type="text" class="reports-search" id="reportSearch" placeholder="🔍 Buscar por nome de arquivo..." />
+              <select class="reports-filter" id="reportFilterEmission">
+                <option value="">Todos os tipos</option>
+                <option value="narrowband">Narrowband</option>
+                <option value="broadband">Broadband</option>
+                <option value="mixed">Mixed</option>
+              </select>
+            </div>
+            <div id="reportsTableWrap"></div>
+            <div id="reportDetailPage" class="report-detail-page" style="display:none;"></div>
+          </div>
+
+          <div class="tool-panels" id="toolPanels">
 
     <div id="authOverlay" class="auth-overlay">
       <div class="auth-card">
-        <h2>Acesso ao WaveSight</h2>
-        <p class="auth-subtitle">Entre para processar medições ou crie sua conta.</p>
-        <div class="auth-field">
-          <label for="authName">Nome</label>
-          <input id="authName" type="text" placeholder="Seu nome" />
-        </div>
-        <div class="auth-field">
-          <label for="authEmail">Email</label>
-          <input id="authEmail" type="email" placeholder="voce@empresa.com" />
-        </div>
-        <div class="auth-field">
-          <label for="authPassword">Senha</label>
-          <input id="authPassword" type="password" placeholder="Minimo de 8 caracteres" />
-        </div>
-        <div class="auth-actions">
-          <button id="btnLogin">Entrar</button>
-          <button id="btnRegister" class="secondary">Criar conta</button>
-        </div>
-        <span id="authStatus" class="auth-status"></span>
+        <section class="auth-hero" aria-label="WaveSight">
+          <div class="auth-brand">
+            <picture>
+              <source srcset="assets/logo.png" type="image/png" />
+              <img class="auth-wordmark" src="assets/logo.png" alt="WaveSight" loading="eager" />
+            </picture>
+            <div class="auth-hero-text">
+              <div class="auth-tagline">Transforme medições em insights.</div>
+              <p class="auth-subtitle">Envie medições EMC, compare curvas, aplique limites e exporte relatórios.</p>
+            </div>
+          </div>
+          <div class="auth-highlights">
+            <div class="auth-highlight"><span class="auth-dot" aria-hidden="true"></span>Envie vários CSVs e compare curvas</div>
+            <div class="auth-highlight"><span class="auth-dot" aria-hidden="true"></span>Aplique limites e normas em poucos cliques</div>
+            <div class="auth-highlight"><span class="auth-dot" aria-hidden="true"></span>Gere relatórios e exporte imagens</div>
+          </div>
+          <div class="auth-meta">Entre para continuar. Sua sessão fica salva neste navegador.</div>
+          <div class="auth-section-title">Destaques</div>
+          <div class="auth-kpis" role="list">
+            <div class="auth-kpi" role="listitem">
+              <strong>Visualização 2D/3D</strong>
+              <span>Explore picos, bandas e comparação em gráficos interativos.</span>
+            </div>
+            <div class="auth-kpi" role="listitem">
+              <strong>Limites e normas</strong>
+              <span>Carregue curvas de limite e presets para checagem rápida.</span>
+            </div>
+            <div class="auth-kpi" role="listitem">
+              <strong>Relatórios</strong>
+              <span>Gere relatório e exporte imagens para apresentações.</span>
+            </div>
+            <div class="auth-kpi" role="listitem">
+              <strong>CSV simples</strong>
+              <span>Duas colunas (freq, dBµV) com cabeçalho opcional.</span>
+            </div>
+          </div>
+
+        </section>
+
+        <section class="auth-form" aria-label="Autenticação">
+          <div class="auth-form-brand" aria-label="WaveSight">
+            <picture>
+              <source srcset="assets/logo.png" type="image/png" />
+              <img class="auth-wordmark" src="assets/logo.png" alt="WaveSight" loading="eager" />
+            </picture>
+            <div class="auth-tagline">Acesse para continuar</div>
+          </div>
+          <div>
+            <div id="authTitle" class="auth-title">Entrar</div>
+            <p id="authHint" class="auth-subtitle">Use seu e-mail e senha.</p>
+          </div>
+
+          <div id="authNameField" class="auth-field hidden">
+            <label for="authName">Nome</label>
+            <input id="authName" type="text" placeholder="Seu nome" autocomplete="name" />
+          </div>
+          <div class="auth-field">
+            <label for="authEmail">E-mail</label>
+            <input id="authEmail" type="email" placeholder="voce@empresa.com" autocomplete="email" />
+          </div>
+          <div class="auth-field">
+            <label for="authPassword">Senha</label>
+            <input id="authPassword" type="password" placeholder="Sua senha" autocomplete="current-password" />
+            <div id="authPasswordHelp" class="auth-help hidden">Mínimo de 8 caracteres.</div>
+          </div>
+
+          <div class="auth-actions">
+            <button id="btnAuthSubmit">Entrar</button>
+            <div class="auth-switch">
+              <span id="authSwitchText">Não tem conta?</span>
+              <button id="authSwitchBtn" class="auth-link" type="button">Criar conta</button>
+            </div>
+          </div>
+
+          <span id="authStatus" class="auth-status"></span>
+        </section>
       </div>
     </div>
 
     <div class="container">
       <div class="panel">
         <div class="controls">
+          <div id="upload" class="group-title">Upload & Processamento</div>
           <div class="control-row">
             <div id="dropzone" class="dropzone">
               <input id="fileInput" type="file" accept=".csv" multiple />
               <div class="dropzone-text">
                 <strong>Arraste seus CSVs aqui</strong>
-                <span>ou clique para selecionar</span>
+                <span>ou clique para selecionar (1+ arquivos; ex.: X/Y/Z)</span>
                 <div id="fileList" class="file-list"></div>
               </div>
             </div>
             <button id="btnUpload">Processar</button>
             <button id="btnReport" class="secondary" disabled>Baixar relatório (HTML)</button>
             <button id="btnReportPdf" class="secondary" disabled>Imprimir PDF</button>
-            <button id="btn3d" class="secondary" disabled>Alternar 3D</button>
+            <button id="btn3d" class="secondary" disabled>Abrir 3D</button>
             <button id="btnClear" class="secondary">Limpar</button>
             <span id="status" class="status loading"></span>
             <span id="spinner" class="spinner hidden" aria-hidden="true"></span>
           </div>
 
-          <div class="control-row">
-            <div class="control">
-              <label for="presetSelect">Preset</label>
-              <select id="presetSelect">
-                <option value="manual">Manual</option>
-                <option value="lowband">Banda baixa</option>
-                <option value="highband">Banda alta</option>
-                <option value="aggressive">Picos agressivos</option>
-              </select>
+          <details class="filter-group" open>
+            <summary>Arquivos por eixo (opcional) <span class="chev" aria-hidden="true">⌄</span></summary>
+            <div class="filter-body">
+              <div class="control-row">
+                <div class="axis-picker">
+                  <button id="btnPickX" class="secondary" type="button">CSV X</button>
+                  <input id="fileInputX" type="file" accept=".csv" class="hidden-input" />
+                  <span id="axisFileX" class="file-chip axis-file">X: —</span>
+                </div>
+                <div class="axis-picker">
+                  <button id="btnPickY" class="secondary" type="button">CSV Y</button>
+                  <input id="fileInputY" type="file" accept=".csv" class="hidden-input" />
+                  <span id="axisFileY" class="file-chip axis-file">Y: —</span>
+                </div>
+                <div class="axis-picker">
+                  <button id="btnPickZ" class="secondary" type="button">CSV Z</button>
+                  <input id="fileInputZ" type="file" accept=".csv" class="hidden-input" />
+                  <span id="axisFileZ" class="file-chip axis-file">Z: —</span>
+                </div>
+              </div>
             </div>
-            <div class="control">
-              <label for="smoothingMethod">Suavização</label>
-              <select id="smoothingMethod">
-                <option value="none">Nenhuma</option>
-                <option value="moving">Média móvel</option>
-                <option value="savgol">Savitzky-Golay</option>
-              </select>
+          </details>
+
+          <details class="filter-group" open>
+            <summary>Ajustes rápidos <span class="chev" aria-hidden="true">⌄</span></summary>
+            <div class="filter-body">
+              <div class="control-row">
+                <div class="control">
+                  <label for="presetSelect">Preset</label>
+                  <select id="presetSelect">
+                    <option value="manual">Manual</option>
+                    <option value="lowband">Banda baixa</option>
+                    <option value="highband">Banda alta</option>
+                    <option value="aggressive">Picos agressivos</option>
+                  </select>
+                </div>
+                <div class="control">
+                  <label for="smoothingMethod">Suavização</label>
+                  <select id="smoothingMethod">
+                    <option value="none">Nenhuma</option>
+                    <option value="moving">Média móvel</option>
+                    <option value="savgol">Savitzky-Golay</option>
+                  </select>
+                </div>
+                <div class="control">
+                  <label for="smoothingWindow">Janela</label>
+                  <input id="smoothingWindow" type="number" min="1" value="7" />
+                </div>
+              </div>
+
+              <details class="filter-group">
+                <summary>Avançado <span class="chev" aria-hidden="true">⌄</span></summary>
+                <div class="filter-body">
+                  <div class="control-row">
+                    <div class="control">
+                      <label for="peakMinHeight">Pico min (dBµV)</label>
+                      <input id="peakMinHeight" type="number" step="0.1" placeholder="ex: 10" />
+                    </div>
+                    <div class="control">
+                      <label for="peakMinDistance">Distância</label>
+                      <input id="peakMinDistance" type="number" min="1" placeholder="ex: 5" />
+                    </div>
+                    <div class="control">
+                      <label for="maxPeaks">Máx picos</label>
+                      <input id="maxPeaks" type="number" min="10" value="200" />
+                    </div>
+                    <div class="control">
+                      <label for="freqMin">Freq min</label>
+                      <input id="freqMin" type="number" step="0.1" placeholder="ex: 10" />
+                    </div>
+                    <div class="control">
+                      <label for="freqMax">Freq max</label>
+                      <input id="freqMax" type="number" step="0.1" placeholder="ex: 100" />
+                    </div>
+                    <div class="control">
+                      <label for="maxPoints">Max pontos</label>
+                      <input id="maxPoints" type="number" min="200" max="20000" value="5000" />
+                    </div>
+                  </div>
+                </div>
+              </details>
             </div>
-            <div class="control">
-              <label for="smoothingWindow">Janela</label>
-              <input id="smoothingWindow" type="number" min="1" value="7" />
+          </details>
+
+          <details class="filter-group">
+            <summary>Limites & normas <span class="chev" aria-hidden="true">⌄</span></summary>
+            <div class="filter-body">
+              <div class="control-row">
+                <div class="control">
+                  <label for="limitSource">Fonte limite</label>
+                  <select id="limitSource">
+                    <option value="none">Nenhum</option>
+                    <option value="file">Arquivo CSV</option>
+                    <option value="preset">Preset</option>
+                    <option value="norm">Norma</option>
+                  </select>
+                </div>
+                <div class="control">
+                  <label for="limitInput">Curva limite</label>
+                  <input id="limitInput" type="file" accept=".csv" />
+                </div>
+                <div class="control">
+                  <label for="limitPreset">Preset limite</label>
+                  <select id="limitPreset">
+                    <option value="none">Nenhum</option>
+                    <option value="cispr_a">CISPR A (exemplo)</option>
+                    <option value="cispr_b">CISPR B (exemplo)</option>
+                    <option value="iec_generic">IEC (exemplo)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="control-row">
+                <div class="control">
+                  <label for="normSelect">Norma</label>
+                  <select id="normSelect"></select>
+                </div>
+                <div class="control">
+                  <label for="normFile">Norma JSON</label>
+                  <input id="normFile" type="file" accept=".json" />
+                </div>
+                <div class="control">
+                  <label for="normClass">Classe</label>
+                  <select id="normClass"></select>
+                </div>
+                <div class="control">
+                  <label for="normBand">Faixa</label>
+                  <select id="normBand"></select>
+                </div>
+              </div>
+              <div class="control-row">
+                <div class="control">
+                  <label for="limitEnabled">Usar limite</label>
+                  <input id="limitEnabled" type="checkbox" />
+                </div>
+                <div class="control">
+                  <label for="limitMargin">Margem (dB)</label>
+                  <input id="limitMargin" type="number" step="0.1" value="0" />
+                </div>
+              </div>
             </div>
-            <div class="control">
-              <label for="peakMinHeight">Pico min (dBµV)</label>
-              <input id="peakMinHeight" type="number" step="0.1" placeholder="ex: 10" />
+          </details>
+
+          <details class="filter-group">
+            <summary>Bandas & 3D <span class="chev" aria-hidden="true">⌄</span></summary>
+            <div class="filter-body">
+              <div class="control-row">
+                <div class="control">
+                  <label for="bandPreset">Preset banda</label>
+                  <select id="bandPreset">
+                    <option value="none">Nenhum</option>
+                    <option value="basic">Baixa/Média/Alta</option>
+                    <option value="wide">0-100 / 100-1000</option>
+                  </select>
+                </div>
+                <div class="control">
+                  <label for="bandMin">Banda min</label>
+                  <input id="bandMin" type="number" step="0.1" placeholder="ex: 0.15" />
+                </div>
+                <div class="control">
+                  <label for="bandMax">Banda max</label>
+                  <input id="bandMax" type="number" step="0.1" placeholder="ex: 30" />
+                </div>
+                <button id="btnAddBand" class="secondary">Adicionar banda</button>
+              </div>
             </div>
-            <div class="control">
-              <label for="peakMinDistance">Distância</label>
-              <input id="peakMinDistance" type="number" min="1" placeholder="ex: 5" />
+          </details>
+
+          <details class="filter-group">
+            <summary>Exportação <span class="chev" aria-hidden="true">⌄</span></summary>
+            <div class="filter-body">
+              <div class="control-row">
+                <div class="control">
+                  <label for="exportWidth">Export Largura</label>
+                  <input id="exportWidth" type="number" min="600" max="6000" value="1600" />
+                </div>
+                <div class="control">
+                  <label for="exportHeight">Export Altura</label>
+                  <input id="exportHeight" type="number" min="400" max="4000" value="900" />
+                </div>
+                <div class="control">
+                  <label for="exportTheme">Tema export</label>
+                  <select id="exportTheme">
+                    <option value="dark">Escuro</option>
+                    <option value="light">Claro</option>
+                  </select>
+                </div>
+                <button id="btnExportImage" class="secondary">Exportar imagem</button>
+              </div>
             </div>
-            <div class="control">
-              <label for="maxPeaks">Máx picos</label>
-              <input id="maxPeaks" type="number" min="10" value="200" />
-            </div>
-            <div class="control">
-              <label for="freqMin">Freq min</label>
-              <input id="freqMin" type="number" step="0.1" placeholder="ex: 10" />
-            </div>
-            <div class="control">
-              <label for="freqMax">Freq max</label>
-              <input id="freqMax" type="number" step="0.1" placeholder="ex: 100" />
-            </div>
-            <div class="control">
-              <label for="showPeaks">Mostrar picos</label>
-              <input id="showPeaks" type="checkbox" checked />
-            </div>
-          </div>
-          <div class="control-row">
-            <div class="control">
-              <label for="limitSource">Fonte limite</label>
-              <select id="limitSource">
-                <option value="none">Nenhum</option>
-                <option value="file">Arquivo CSV</option>
-                <option value="preset">Preset</option>
-                <option value="norm">Norma</option>
-              </select>
-            </div>
-            <div class="control">
-              <label for="limitInput">Curva limite</label>
-              <input id="limitInput" type="file" accept=".csv" />
-            </div>
-            <div class="control">
-              <label for="limitPreset">Preset limite</label>
-              <select id="limitPreset">
-                <option value="none">Nenhum</option>
-                <option value="cispr_a">CISPR A (exemplo)</option>
-                <option value="cispr_b">CISPR B (exemplo)</option>
-                <option value="iec_generic">IEC (exemplo)</option>
-              </select>
-            </div>
-            <div class="control">
-              <label for="normSelect">Norma</label>
-              <select id="normSelect"></select>
-            </div>
-            <div class="control">
-              <label for="normFile">Norma JSON</label>
-              <input id="normFile" type="file" accept=".json" />
-            </div>
-            <div class="control">
-              <label for="normClass">Classe</label>
-              <select id="normClass"></select>
-            </div>
-            <div class="control">
-              <label for="normBand">Faixa</label>
-              <select id="normBand"></select>
-            </div>
-            <div class="control">
-              <label for="limitEnabled">Usar limite</label>
-              <input id="limitEnabled" type="checkbox" />
-            </div>
-            <div class="control">
-              <label for="limitMargin">Margem (dB)</label>
-              <input id="limitMargin" type="number" step="0.1" value="0" />
-            </div>
-            <div class="control">
-              <label for="bandPreset">Preset banda</label>
-              <select id="bandPreset">
-                <option value="none">Nenhum</option>
-                <option value="basic">Baixa/Média/Alta</option>
-                <option value="wide">0-100 / 100-1000</option>
-              </select>
-            </div>
-            <div class="control">
-              <label for="bandMin">Banda min</label>
-              <input id="bandMin" type="number" step="0.1" placeholder="ex: 0.15" />
-            </div>
-            <div class="control">
-              <label for="bandMax">Banda max</label>
-              <input id="bandMax" type="number" step="0.1" placeholder="ex: 30" />
-            </div>
-            <button id="btnAddBand" class="secondary">Adicionar banda</button>
-            <div class="control">
-              <label for="mode3d">3D</label>
-              <select id="mode3d">
-                <option value="lines">Linhas</option>
-                <option value="surface">Superfície</option>
-              </select>
-            </div>
-            <div class="control">
-              <label for="bins3d">Bins 3D</label>
-              <input id="bins3d" type="number" min="50" max="800" value="200" />
-            </div>
-            <div class="control">
-              <label for="maxPoints">Max pontos</label>
-              <input id="maxPoints" type="number" min="200" max="20000" value="5000" />
-            </div>
-          </div>
-          <div class="control-row">
-            <div class="control">
-              <label for="exportWidth">Export Largura</label>
-              <input id="exportWidth" type="number" min="600" max="6000" value="1600" />
-            </div>
-            <div class="control">
-              <label for="exportHeight">Export Altura</label>
-              <input id="exportHeight" type="number" min="400" max="4000" value="900" />
-            </div>
-            <div class="control">
-              <label for="exportTheme">Tema export</label>
-              <select id="exportTheme">
-                <option value="dark">Escuro</option>
-                <option value="light">Claro</option>
-              </select>
-            </div>
-            <button id="btnExportImage" class="secondary">Exportar imagem</button>
-            <div class="control">
-              <label for="baselineSelect">Baseline</label>
-              <select id="baselineSelect"></select>
-            </div>
-          </div>
+          </details>
         </div>
       </div>
 
       <div class="panel">
+        <div id="insights" class="group-title">Insights</div>
         <div id="stats" class="stats"></div>
       </div>
 
       <div class="panel">
-        <div class="section-title">Padrões detectados</div>
+        <div class="panel-head">
+          <div class="title">Insights Avançados</div>
+        </div>
+        <div class="insight-grid">
+          <details class="filter-group" open>
+            <summary>Resumo <span class="chev" aria-hidden="true">⌄</span></summary>
+            <div class="filter-body">
+              <div id="insightsSummaryCards" class="insight-kpis"></div>
+              <div id="insightsFingerprint" class="insight-list"></div>
+            </div>
+          </details>
+
+          <details class="filter-group" open>
+            <summary>Pontos de atenção <span class="chev" aria-hidden="true">⌄</span></summary>
+            <div class="filter-body">
+              <div id="criticalPeaks"></div>
+              <div class="control-row">
+                <button id="btnAddBookmark" class="secondary" type="button">Adicionar marcador</button>
+                <button id="btnClearBookmarks" class="secondary" type="button">Limpar marcadores</button>
+              </div>
+              <div id="bookmarkList" class="insight-list"></div>
+            </div>
+          </details>
+
+          <details class="filter-group">
+            <summary>Qualidade do CSV <span class="chev" aria-hidden="true">⌄</span></summary>
+            <div class="filter-body">
+              <div id="qualityIssues" class="insight-list"></div>
+            </div>
+          </details>
+
+          <details class="filter-group">
+            <summary>Comparação rápida <span class="chev" aria-hidden="true">⌄</span></summary>
+            <div class="filter-body">
+              <div class="pattern-grid">
+                <div class="panel" style="padding:12px;">
+                  <div class="group-title">Resumo por arquivo</div>
+                  <div id="trendPlot" class="plot-mini"></div>
+                </div>
+                <div class="panel" style="padding:12px;">
+                  <div class="group-title">Δ vs baseline (mapa)</div>
+                  <div id="deltaHeatmapPlot" class="plot-mini"></div>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <details class="filter-group">
+            <summary>Sugestões <span class="chev" aria-hidden="true">⌄</span></summary>
+            <div class="filter-body">
+              <div id="insightSuggestions" class="insight-list"></div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <!-- AI Insights Card -->
+      <div class="panel" id="aiInsightsSection">
+        <div class="panel-head">
+          <div class="title">🤖 AI Insights</div>
+        </div>
+        <div class="ai-panel" id="aiInsightsCard">
+          <div class="ai-header">
+            <span class="ai-badge ai-inactive" id="aiBadge">Análise sem IA</span>
+            <span id="aiEmissionBadge"></span>
+          </div>
+          <div class="ai-body" id="aiInsightsBody">
+            <div class="ai-hint">Processe um CSV para ver insights. Configure <code>AI_PROVIDER</code> e <code>AI_API_KEY</code> no servidor para diagnósticos automáticos por IA.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Revision Comparison -->
+      <div class="panel" id="revisionComparisonSection" style="display:none;">
+        <div class="panel-head">
+          <div class="title">📊 Comparação entre revisões</div>
+        </div>
+        <div id="revisionComparisonBody" class="revision-panel"></div>
+      </div>
+
+      <div class="panel">
+        <div id="patternsSection" class="section-title">Padrões detectados</div>
         <div id="patterns" class="pattern-grid"></div>
       </div>
 
       <div class="panel">
-        <div class="section-title">Bandas</div>
+        <div id="bands" class="section-title">Bandas</div>
         <div id="bandList" class="pill-list"></div>
         <div id="bandStats"></div>
       </div>
 
       <div class="panel">
-        <div class="section-title">Comparação entre medições</div>
+        <div id="comparisonSection" class="section-title">Comparação entre medições</div>
         <div id="comparison"></div>
       </div>
 
       <div class="panel">
+        <div class="panel-head">
+          <div class="title">Gráficos</div>
+          <div class="chart-controls" aria-label="Opções do gráfico">
+            <div class="control compact">
+              <label for="plot2dMode">2D</label>
+              <select id="plot2dMode">
+                <option value="lines">Curvas</option>
+                <option value="area">Área</option>
+                <option value="points">Pontos</option>
+                <option value="lines_points">Curvas + pontos</option>
+                <option value="heatmap">Mapa (heatmap)</option>
+                <option value="envelope_max">Envelope (máx)</option>
+                <option value="envelope_mean">Envelope (média)</option>
+                <option value="envelope_min">Envelope (mín)</option>
+                <option value="delta">Δ vs baseline</option>
+                <option value="margin">Margem do limite</option>
+              </select>
+            </div>
+            <div class="control compact">
+              <label for="showCommonBands">Bandas</label>
+              <input id="showCommonBands" type="checkbox" checked />
+            </div>
+            <div class="control compact">
+              <label for="showHarmonics2d">Harmônicos</label>
+              <input id="showHarmonics2d" type="checkbox" />
+            </div>
+            <div class="control compact">
+              <label for="showPeaks">Picos</label>
+              <input id="showPeaks" type="checkbox" checked />
+            </div>
+            <div class="control compact">
+              <label for="showPeakLabels">Etiquetas</label>
+              <input id="showPeakLabels" type="checkbox" />
+            </div>
+            <div class="control compact">
+              <label for="peakLabelCount">Qtd</label>
+              <input id="peakLabelCount" type="number" min="1" max="30" value="5" />
+            </div>
+            <div class="control compact">
+              <label for="heatmapBins">Bins</label>
+              <input id="heatmapBins" type="number" min="80" max="1200" value="320" />
+            </div>
+            <div class="control compact">
+              <label for="baselineSelect">Baseline</label>
+              <select id="baselineSelect"></select>
+            </div>
+            <button id="btn3dChart" class="secondary" type="button" disabled>Abrir 3D</button>
+          </div>
+        </div>
         <div id="plot2d" class="plot"></div>
       </div>
 
       <div class="panel" id="panel3d" style="display:none;">
+        <div class="panel-head">
+          <div class="title">3D</div>
+          <div class="chart-controls" aria-label="Opções do gráfico 3D">
+            <div class="control compact">
+              <label for="mode3d">Modo</label>
+              <select id="mode3d">
+                <option value="lines">Linhas</option>
+                <option value="lines_points">Linhas + pontos</option>
+                <option value="points">Pontos</option>
+                <option value="points_intensity">Pontos (intensidade)</option>
+                <option value="lines_points_intensity">Linhas + pontos (intensidade)</option>
+                <option value="surface">Superfície</option>
+                <option value="surface_lines">Superfície + linhas</option>
+              </select>
+            </div>
+            <div class="control compact">
+              <label for="bins3d">Bins</label>
+              <input id="bins3d" type="number" min="50" max="800" value="200" />
+            </div>
+            <div class="control compact">
+              <label for="colorscale3d">Cores</label>
+              <select id="colorscale3d">
+                <option value="Viridis">Viridis</option>
+                <option value="Turbo" selected>Turbo</option>
+                <option value="Cividis">Cividis</option>
+                <option value="IceFire">IceFire</option>
+              </select>
+            </div>
+            <div class="control compact">
+              <label for="showContours3d">Contornos</label>
+              <input id="showContours3d" type="checkbox" />
+            </div>
+            <div class="control compact">
+              <label for="showLimit3d">Limite</label>
+              <input id="showLimit3d" type="checkbox" />
+            </div>
+            <div class="control compact">
+              <label for="camera3d">Câmera</label>
+              <select id="camera3d">
+                <option value="iso" selected>Isométrica</option>
+                <option value="top">Topo</option>
+                <option value="front">Frente</option>
+                <option value="side">Lado</option>
+              </select>
+            </div>
+          </div>
+        </div>
         <div id="plot3d" class="plot-3d"></div>
       </div>
     </div>
+        </div>
+      </div>
+    </div>
+          </div><!-- close tool-panels -->
 
     <script>
       const API_URL = `${window.location.origin}/api`;
       const fileInput = document.getElementById("fileInput");
+      const fileInputX = document.getElementById("fileInputX");
+      const fileInputY = document.getElementById("fileInputY");
+      const fileInputZ = document.getElementById("fileInputZ");
       const dropzone = document.getElementById("dropzone");
       const fileList = document.getElementById("fileList");
+      const btnPickX = document.getElementById("btnPickX");
+      const btnPickY = document.getElementById("btnPickY");
+      const btnPickZ = document.getElementById("btnPickZ");
+      const axisFileX = document.getElementById("axisFileX");
+      const axisFileY = document.getElementById("axisFileY");
+      const axisFileZ = document.getElementById("axisFileZ");
       const btnUpload = document.getElementById("btnUpload");
       const btnReport = document.getElementById("btnReport");
       const btnReportPdf = document.getElementById("btnReportPdf");
       const btn3d = document.getElementById("btn3d");
+      const btn3dChart = document.getElementById("btn3dChart");
       const btnClear = document.getElementById("btnClear");
       const statusEl = document.getElementById("status");
       const spinnerEl = document.getElementById("spinner");
@@ -583,6 +737,12 @@
       const freqMin = document.getElementById("freqMin");
       const freqMax = document.getElementById("freqMax");
       const showPeaks = document.getElementById("showPeaks");
+      const showCommonBands = document.getElementById("showCommonBands");
+      const showHarmonics2d = document.getElementById("showHarmonics2d");
+      const plot2dMode = document.getElementById("plot2dMode");
+      const showPeakLabels = document.getElementById("showPeakLabels");
+      const peakLabelCount = document.getElementById("peakLabelCount");
+      const heatmapBins = document.getElementById("heatmapBins");
       const limitInput = document.getElementById("limitInput");
       const limitPreset = document.getElementById("limitPreset");
       const limitSource = document.getElementById("limitSource");
@@ -598,6 +758,10 @@
       const btnAddBand = document.getElementById("btnAddBand");
       const mode3d = document.getElementById("mode3d");
       const bins3d = document.getElementById("bins3d");
+      const colorscale3d = document.getElementById("colorscale3d");
+      const showContours3d = document.getElementById("showContours3d");
+      const showLimit3d = document.getElementById("showLimit3d");
+      const camera3d = document.getElementById("camera3d");
       const maxPoints = document.getElementById("maxPoints");
       const exportWidth = document.getElementById("exportWidth");
       const exportHeight = document.getElementById("exportHeight");
@@ -608,11 +772,25 @@
       const bandListEl = document.getElementById("bandList");
       const bandStatsEl = document.getElementById("bandStats");
       const comparisonEl = document.getElementById("comparison");
+      const insightsSummaryCardsEl = document.getElementById("insightsSummaryCards");
+      const insightsFingerprintEl = document.getElementById("insightsFingerprint");
+      const criticalPeaksEl = document.getElementById("criticalPeaks");
+      const qualityIssuesEl = document.getElementById("qualityIssues");
+      const trendPlotEl = document.getElementById("trendPlot");
+      const deltaHeatmapPlotEl = document.getElementById("deltaHeatmapPlot");
+      const insightSuggestionsEl = document.getElementById("insightSuggestions");
+      const btnAddBookmark = document.getElementById("btnAddBookmark");
+      const btnClearBookmarks = document.getElementById("btnClearBookmarks");
+      const bookmarkListEl = document.getElementById("bookmarkList");
       const authName = document.getElementById("authName");
       const authEmail = document.getElementById("authEmail");
       const authPassword = document.getElementById("authPassword");
-      const btnRegister = document.getElementById("btnRegister");
-      const btnLogin = document.getElementById("btnLogin");
+      const authTitleEl = document.getElementById("authTitle");
+      const authHintEl = document.getElementById("authHint");
+      const authNameField = document.getElementById("authNameField");
+      const btnAuthSubmit = document.getElementById("btnAuthSubmit");
+      const authSwitchTextEl = document.getElementById("authSwitchText");
+      const authSwitchBtn = document.getElementById("authSwitchBtn");
       const btnLogout = document.getElementById("btnLogout");
       const authStatusEl = document.getElementById("authStatus");
       const userBadgeEl = document.getElementById("userBadge");
@@ -632,8 +810,21 @@
       let bands = [];
       let authToken = localStorage.getItem("wavesight_token") || "";
       let currentUser = null;
+      let authMode = "login";
+      let plot2dView = { xRange: null, focusFreq: null };
+      let bookmarks = [];
 
       const colors = ["#57d6ff", "#ffb454", "#6ddf7a", "#ff6b6b", "#8c7bff", "#00d4a4"];
+      const COMMON_BANDS = [
+        { label: "LW", min: 0.15, max: 0.28 },
+        { label: "MW", min: 0.53, max: 1.7 },
+        { label: "SW", min: 1.7, max: 30 },
+        { label: "FM", min: 75, max: 108 },
+        { label: "VHF", min: 108, max: 300 },
+        { label: "UHF", min: 300, max: 1000 },
+        { label: "2.4G", min: 2400, max: 2500 },
+        { label: "5G", min: 5150, max: 5850 }
+      ];
       const builtinNorms = {
         cispr_example: {
           label: "CISPR (exemplo)",
@@ -668,6 +859,302 @@
         }
       };
 
+      const RE310_LEVEL2_REQUIREMENTS = [
+        { type: "group", label: "Broadcast Services" },
+        {
+          type: "row",
+          id: "BS-01",
+          description: "LW",
+          min: 0.15,
+          max: 0.28,
+          pk: null,
+          av: { bw_khz: 9, limit: 36 },
+          qp: { bw_khz: 9, limit: 43 }
+        },
+        {
+          type: "row",
+          id: "BS-02",
+          description: "MW",
+          min: 0.53,
+          max: 1.7,
+          pk: null,
+          av: { bw_khz: 9, limit: 12 },
+          qp: { bw_khz: 9, limit: 30 }
+        },
+        {
+          type: "row",
+          id: "BS-03",
+          description: "SW",
+          min: 1.7,
+          max: 30,
+          pk: null,
+          av: { bw_khz: 9, limit: 12 },
+          qp: { bw_khz: 9, limit: 24 }
+        },
+        {
+          type: "row",
+          id: "BS-04",
+          description: "FM 1",
+          min: 75,
+          max: 91,
+          pk: { bw_khz: 9, limit: 18 },
+          av: { bw_khz: 9, limit: 12 },
+          qp: { bw_khz: 120, limit: 24 }
+        },
+        {
+          type: "row",
+          id: "BS-05",
+          description: "FM 2",
+          min: 86,
+          max: 109,
+          pk: { bw_khz: 9, limit: 18 },
+          av: { bw_khz: 9, limit: 12 },
+          qp: { bw_khz: 120, limit: 24 }
+        },
+        { type: "group", label: "Digital Broadcast Services" },
+        {
+          type: "row",
+          id: "DB-01",
+          description: "DAB III and TV Band III",
+          min: 167,
+          max: 245,
+          pk: { bw_khz: 1000, limit: 32 },
+          av: { bw_khz: 1000, limit: 22 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "DB-02",
+          description: "TV Band IV/V",
+          min: 470,
+          max: 890,
+          pk: { bw_khz: 1000, limit: 38 },
+          av: { bw_khz: 1000, limit: 28 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "DB-03",
+          description: "DAB L Band",
+          min: 1447,
+          max: 1494,
+          pk: { bw_khz: 1000, limit: 46 },
+          av: { bw_khz: 1000, limit: 36 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "DB-04",
+          description: "SDARS",
+          min: 2320,
+          max: 2345,
+          pk: { bw_khz: 1000, limit: 46 },
+          av: { bw_khz: 1000, limit: 36 },
+          qp: null
+        },
+        { type: "group", label: "Mobile Services" },
+        {
+          type: "row",
+          id: "MS-01",
+          description: "4m",
+          min: 65,
+          max: 88,
+          pk: { bw_khz: 9, limit: 18 },
+          av: { bw_khz: 9, limit: 12 },
+          qp: { bw_khz: 120, limit: 24 }
+        },
+        {
+          type: "row",
+          id: "MS-02",
+          description: "2m",
+          min: 140,
+          max: 176,
+          pk: { bw_khz: 9, limit: 18 },
+          av: { bw_khz: 9, limit: 12 },
+          qp: { bw_khz: 120, limit: 24 }
+        },
+        {
+          type: "row",
+          id: "MS-03",
+          description: "RKE & TPMS 1",
+          min: 310,
+          max: 320,
+          pk: { bw_khz: 9, limit: 20 },
+          av: { bw_khz: 9, limit: 14 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-04",
+          description: "TETRA",
+          min: 380,
+          max: 424,
+          pk: { bw_khz: 9, limit: 25 },
+          av: { bw_khz: 9, limit: 19 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-05",
+          description: "RKE & TPMS 2",
+          min: 425,
+          max: 439,
+          pk: { bw_khz: 9, limit: 25 },
+          av: { bw_khz: 9, limit: 19 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-06",
+          description: "Police (Europe)",
+          min: 440,
+          max: 470,
+          pk: { bw_khz: 9, limit: 25 },
+          av: { bw_khz: 9, limit: 19 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-07",
+          description: "RKE",
+          min: 868,
+          max: 870,
+          pk: { bw_khz: 9, limit: 30 },
+          av: { bw_khz: 9, limit: 24 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-08",
+          description: "RKE",
+          min: 902,
+          max: 904,
+          pk: { bw_khz: 9, limit: 30 },
+          av: { bw_khz: 9, limit: 24 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-09",
+          description: "4G",
+          min: 703,
+          max: 821,
+          pk: { bw_khz: 1000, limit: 46 },
+          av: { bw_khz: 1000, limit: 36 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-10",
+          description: "GSM 850",
+          min: 859,
+          max: 895,
+          pk: { bw_khz: 120, limit: 32 },
+          av: { bw_khz: 120, limit: 12 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-11",
+          description: "GSM 900",
+          min: 915,
+          max: 960,
+          pk: { bw_khz: 120, limit: 32 },
+          av: { bw_khz: 120, limit: 12 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-12",
+          description: "GPS",
+          min: 1567,
+          max: 1583,
+          pk: null,
+          av: { bw_khz: 9, limit: 10 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-13",
+          description: "GLONASS GPS",
+          min: 1585,
+          max: 1616,
+          pk: null,
+          av: { bw_khz: 9, limit: 10 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-14",
+          description: "GSM 1800",
+          min: 1805,
+          max: 1880,
+          pk: { bw_khz: 120, limit: 34 },
+          av: { bw_khz: 120, limit: 14 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-15",
+          description: "GSM 1900",
+          min: 1930,
+          max: 1995,
+          pk: { bw_khz: 120, limit: 34 },
+          av: { bw_khz: 120, limit: 14 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-16",
+          description: "3G",
+          min: 1900,
+          max: 2170,
+          pk: { bw_khz: 1000, limit: 46 },
+          av: { bw_khz: 1000, limit: 36 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-17",
+          description: "WiFi and Bluetooth",
+          min: 2400,
+          max: 2500,
+          pk: { bw_khz: 1000, limit: 46 },
+          av: { bw_khz: 1000, limit: 36 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-18",
+          description: "4G",
+          min: 2496,
+          max: 2690,
+          pk: { bw_khz: 1000, limit: 46 },
+          av: { bw_khz: 1000, limit: 36 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-19",
+          description: "WiFi",
+          min: 4915,
+          max: 5825,
+          pk: { bw_khz: 1000, limit: 56 },
+          av: { bw_khz: 1000, limit: 46 },
+          qp: null
+        },
+        {
+          type: "row",
+          id: "MS-20",
+          description: "ITS",
+          min: 5875,
+          max: 5905,
+          pk: { bw_khz: 1000, limit: 56 },
+          av: { bw_khz: 1000, limit: 46 },
+          qp: null
+        }
+      ];
+
       function setStatus(text, type = "loading") {
         statusEl.textContent = text;
         statusEl.classList.remove("ok", "error", "loading");
@@ -690,6 +1177,25 @@
         return { Authorization: `Bearer ${authToken}` };
       }
 
+      const authPasswordHelp = document.getElementById("authPasswordHelp");
+
+      function setAuthMode(mode) {
+        authMode = mode === "register" ? "register" : "login";
+        const isRegister = authMode === "register";
+        authNameField.classList.toggle("hidden", !isRegister);
+        authPasswordHelp.classList.toggle("hidden", !isRegister);
+        authTitleEl.textContent = isRegister ? "Criar conta" : "Entrar";
+        authHintEl.textContent = isRegister
+          ? "Só precisamos do seu nome, e-mail e senha."
+          : "Informe seu e-mail e senha.";
+        btnAuthSubmit.textContent = isRegister ? "Criar conta" : "Entrar";
+        authSwitchTextEl.textContent = isRegister ? "Já tem conta?" : "Não tem conta?";
+        authSwitchBtn.textContent = isRegister ? "Entrar" : "Criar conta";
+        authPassword.setAttribute("autocomplete", isRegister ? "new-password" : "current-password");
+        authPassword.placeholder = isRegister ? "Crie uma senha (mín. 8)" : "Sua senha";
+        setAuthStatus("");
+      }
+
       function updateAuthUi() {
         const loggedIn = !!currentUser;
         authOverlay.classList.toggle("hidden", loggedIn);
@@ -697,16 +1203,22 @@
 
         btnLogout.disabled = !loggedIn;
         btnLogout.classList.toggle("hidden", !loggedIn);
-        btnLogin.disabled = false;
-        btnRegister.disabled = false;
+        btnAuthSubmit.disabled = false;
         authName.disabled = loggedIn;
         authEmail.disabled = false;
         authPassword.disabled = false;
         fileInput.disabled = !loggedIn;
+        fileInputX.disabled = !loggedIn;
+        fileInputY.disabled = !loggedIn;
+        fileInputZ.disabled = !loggedIn;
+        btnPickX.disabled = !loggedIn;
+        btnPickY.disabled = !loggedIn;
+        btnPickZ.disabled = !loggedIn;
         dropzone.style.opacity = loggedIn ? "1" : "0.5";
         btnUpload.disabled = !loggedIn;
         if (!loggedIn) {
           btn3d.disabled = true;
+          btn3dChart.disabled = true;
           btnReport.disabled = true;
           btnReportPdf.disabled = true;
         }
@@ -744,11 +1256,11 @@
         const email = (authEmail.value || "").trim();
         const password = authPassword.value || "";
         if (!name || !email || !password) {
-          setAuthStatus("Preencha nome, email e senha.", "error");
+          setAuthStatus("Preencha nome, e-mail e senha.", "error");
           return;
         }
         try {
-          btnRegister.disabled = true;
+          btnAuthSubmit.disabled = true;
           const res = await fetch(`${API_URL}/auth/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -764,7 +1276,7 @@
         } catch (err) {
           setAuthStatus(err.message || "Falha no cadastro", "error");
         } finally {
-          if (!currentUser) btnRegister.disabled = false;
+          if (!currentUser) btnAuthSubmit.disabled = false;
         }
       }
 
@@ -772,11 +1284,11 @@
         const email = (authEmail.value || "").trim();
         const password = authPassword.value || "";
         if (!email || !password) {
-          setAuthStatus("Preencha email e senha.", "error");
+          setAuthStatus("Preencha e-mail e senha.", "error");
           return;
         }
         try {
-          btnLogin.disabled = true;
+          btnAuthSubmit.disabled = true;
           const res = await fetch(`${API_URL}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -789,10 +1301,12 @@
           authPassword.value = "";
           setAuthStatus("Login realizado.", "ok");
           await loadCurrentUser();
+          loadSidebarProjects();
+          loadSidebarAnalyses();
         } catch (err) {
           setAuthStatus(err.message || "Falha no login", "error");
         } finally {
-          if (!currentUser) btnLogin.disabled = false;
+          if (!currentUser) btnAuthSubmit.disabled = false;
         }
       }
 
@@ -801,6 +1315,7 @@
         currentUser = null;
         localStorage.removeItem("wavesight_token");
         setAuthStatus("Sessao encerrada.");
+        setAuthMode("login");
         updateAuthUi();
       }
 
@@ -890,7 +1405,7 @@
         }
         statsEl.innerHTML = series.map((s, idx) => `
           <div class="stat-card">
-            <div><strong>${s.filename || `Medição ${idx + 1}`}</strong></div>
+            <div><strong>${escapeHtml(getSeriesLabel(s, idx))}</strong></div>
             <div>Amostras: <strong>${s.count}</strong>${filterActive ? " (filtrado)" : ""}</div>
             <div>Min: <strong>${s.stats.min.toFixed(2)} dBµV</strong></div>
             <div>Max: <strong>${s.stats.max.toFixed(2)} dBµV</strong></div>
@@ -900,6 +1415,402 @@
             ${s.smoothing && s.smoothing.method !== "none" ? `<div>Suavização: <strong>${s.smoothing.method}</strong> (${s.smoothing.window})</div>` : ""}
           </div>
         `).join("");
+      }
+
+      function loadBookmarks() {
+        try {
+          const raw = localStorage.getItem("wavesight_bookmarks") || "[]";
+          const parsed = JSON.parse(raw);
+          bookmarks = Array.isArray(parsed) ? parsed.filter(b => typeof b?.frequency === "number") : [];
+        } catch (_err) {
+          bookmarks = [];
+        }
+      }
+
+      function saveBookmarks() {
+        localStorage.setItem("wavesight_bookmarks", JSON.stringify(bookmarks.slice(0, 200)));
+      }
+
+      function renderBookmarksList() {
+        if (!bookmarkListEl) return;
+        if (!bookmarks.length) {
+          bookmarkListEl.innerHTML = "<div class=\"status\">Nenhum marcador salvo.</div>";
+          return;
+        }
+        bookmarkListEl.innerHTML = bookmarks
+          .slice()
+          .sort((a, b) => (a.frequency || 0) - (b.frequency || 0))
+          .map((b, idx) => `
+            <div class="insight-item">
+              <div>
+                <div><strong>${escapeHtml(b.label || "Marcador")}</strong></div>
+                <div>Freq: ${formatCompactNumber(b.frequency, 2)} MHz</div>
+              </div>
+              <div class="insight-actions">
+                <button class="secondary" data-focus="${b.frequency}">Focar</button>
+                <button class="secondary" data-del="${idx}">Remover</button>
+              </div>
+            </div>
+          `)
+          .join("");
+        bookmarkListEl.querySelectorAll("button[data-focus]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const f = parseFloat(btn.getAttribute("data-focus") || "");
+            if (!Number.isNaN(f)) focusOnFrequency(f, "Marcador");
+          });
+        });
+        bookmarkListEl.querySelectorAll("button[data-del]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const index = parseInt(btn.getAttribute("data-del") || "", 10);
+            if (Number.isNaN(index)) return;
+            const sorted = bookmarks.slice().sort((a, b) => (a.frequency || 0) - (b.frequency || 0));
+            const toRemove = sorted[index];
+            bookmarks = bookmarks.filter(b => !(b.frequency === toRemove.frequency && b.label === toRemove.label));
+            saveBookmarks();
+            renderBookmarksList();
+            refreshPlots();
+          });
+        });
+      }
+
+      function getLimitAt(freq) {
+        updateLimitSeries();
+        if (!limitEnabled.checked || !limitSeries) return null;
+        const marginDb = parseFloat(limitMargin.value || "0") || 0;
+        const val = interpolateAt(limitSeries.frequency, limitSeries.intensity, freq);
+        return val == null ? null : val + marginDb;
+      }
+
+      function getBaselineSeries(series) {
+        const baseIndex = parseInt(baselineSelect.value || "0", 10);
+        if (Number.isNaN(baseIndex)) return null;
+        return series[baseIndex] || null;
+      }
+
+      function focusOnFrequency(freq, label = "") {
+        if (!lastSeries.length) return;
+        const allFreq = lastSeries.flatMap(s => s.frequency || []);
+        if (!allFreq.length) return;
+        const minAll = Math.min(...allFreq);
+        const maxAll = Math.max(...allFreq);
+        const span = Math.max((maxAll - minAll) * 0.06, 1e-6);
+        const x0 = Math.max(minAll, freq - span);
+        const x1 = Math.min(maxAll, freq + span);
+        plot2dView = { xRange: [x0, x1], focusFreq: freq, label };
+        refreshPlots();
+      }
+
+      function computeComplianceSummary(series, limitActive) {
+        const out = {
+          status: "N/A",
+          totalExceed: 0,
+          worstMargin: null,
+          worstMarginInfo: "",
+          maxPeak: null,
+          maxPeakInfo: "",
+          totalPeaks: 0
+        };
+
+        let maxPeak = null;
+        series.forEach((s, idx) => {
+          const peaks = s.peaks || [];
+          out.totalPeaks += peaks.length;
+          peaks.forEach(p => {
+            if (!maxPeak || p.intensity > maxPeak.intensity) {
+              maxPeak = { ...p, label: getSeriesLabel(s, idx) };
+            }
+          });
+        });
+        if (maxPeak) {
+          out.maxPeak = maxPeak.intensity;
+          out.maxPeakInfo = `${formatCompactNumber(maxPeak.frequency, 2)} MHz — ${escapeHtml(maxPeak.label)}`;
+        }
+
+        if (!limitActive) return out;
+        let worst = { margin: -Infinity, label: "", freq: null };
+        series.forEach((s, idx) => {
+          const ex = s.limit?.exceedances ?? 0;
+          out.totalExceed += ex;
+          if (s.limit && s.limit.maxMargin != null && s.limit.maxMargin > worst.margin) {
+            worst = { margin: s.limit.maxMargin, label: getSeriesLabel(s, idx), freq: null };
+          }
+          if (s.exceedPoints && s.exceedPoints.length) {
+            const p = s.exceedPoints[0];
+            if (p && typeof p.frequency === "number") worst.freq = p.frequency;
+          }
+        });
+        out.worstMargin = worst.margin === -Infinity ? null : worst.margin;
+        out.worstMarginInfo = worst.label ? escapeHtml(worst.label) : "";
+        out.status = out.totalExceed === 0 ? "PASS" : "FAIL";
+        return out;
+      }
+
+      function computeTopCriticalPeaks(series, limitActive, maxRows = 15) {
+        const baseline = getBaselineSeries(series);
+        const rows = [];
+        series.forEach((s, idx) => {
+          const label = getSeriesLabel(s, idx);
+          (s.peaks || []).forEach(p => {
+            const lim = limitActive ? getLimitAt(p.frequency) : null;
+            const margin = lim == null ? null : p.intensity - lim;
+            const baseVal = baseline ? interpolateAt(baseline.frequency, baseline.intensity, p.frequency) : null;
+            const delta = baseVal == null ? null : p.intensity - baseVal;
+            const severity = margin != null ? margin : p.intensity;
+            rows.push({ label, frequency: p.frequency, intensity: p.intensity, margin, delta, severity });
+          });
+        });
+        rows.sort((a, b) => (b.severity ?? 0) - (a.severity ?? 0));
+        return rows.slice(0, maxRows);
+      }
+
+      function computeCsvQuality(series) {
+        const issues = [];
+        series.forEach((s, idx) => {
+          const label = getSeriesLabel(s, idx);
+          const xs = s.frequency || [];
+          const ys = s.intensity || [];
+          if (xs.length < 5) {
+            issues.push({ label, text: "Poucas amostras; confira se o CSV está completo." });
+            return;
+          }
+          let nonIncreasing = 0;
+          let nanCount = 0;
+          for (let i = 1; i < xs.length; i++) {
+            if (!(xs[i] > xs[i - 1])) nonIncreasing += 1;
+          }
+          for (let i = 0; i < ys.length; i++) {
+            if (!Number.isFinite(ys[i])) nanCount += 1;
+          }
+          if (nanCount) issues.push({ label, text: `${nanCount} valores inválidos (NaN/inf) em intensidade.` });
+          if (nonIncreasing) issues.push({ label, text: `Frequência não está estritamente crescente (${nonIncreasing} ocorrências).` });
+
+          const diffs = [];
+          for (let i = 1; i < xs.length; i++) {
+            const d = xs[i] - xs[i - 1];
+            if (Number.isFinite(d) && d > 0) diffs.push(d);
+          }
+          diffs.sort((a, b) => a - b);
+          if (diffs.length > 10) {
+            const median = diffs[Math.floor(diffs.length / 2)];
+            const gaps = diffs.filter(d => d > median * 10).length;
+            if (gaps) issues.push({ label, text: `Saltos grandes na frequência detectados (${gaps}); pode haver gaps no sweep.` });
+          }
+        });
+        return issues;
+      }
+
+      function suggestPreset(series) {
+        const allFreq = series.flatMap(s => s.frequency || []);
+        const maxF = allFreq.length ? Math.max(...allFreq) : 0;
+        const avgPeaks = series.length ? series.reduce((acc, s) => acc + ((s.peaks || []).length), 0) / series.length : 0;
+        if (avgPeaks > 250) return { preset: "aggressive", reason: "Muitos picos detectados; modo mais agressivo ajuda a destacar." };
+        if (maxF > 300) return { preset: "highband", reason: "Faixa alta; Savitzky-Golay tende a suavizar bem mantendo forma." };
+        return { preset: "lowband", reason: "Faixa baixa; média móvel costuma dar boa estabilidade." };
+      }
+
+      function renderAdvancedInsights(series, filterActive, limitActive) {
+        if (!series || !series.length) {
+          insightsSummaryCardsEl.innerHTML = "";
+          insightsFingerprintEl.innerHTML = "";
+          criticalPeaksEl.innerHTML = "";
+          qualityIssuesEl.innerHTML = "";
+          insightSuggestionsEl.innerHTML = "";
+          Plotly.newPlot("trendPlot", [], { paper_bgcolor: "#151b23", plot_bgcolor: "#151b23" }, { responsive: true });
+          Plotly.newPlot("deltaHeatmapPlot", [], { paper_bgcolor: "#151b23", plot_bgcolor: "#151b23" }, { responsive: true });
+          return;
+        }
+
+        const summary = computeComplianceSummary(series, limitActive);
+        const statusClass = summary.status === "PASS" ? "pass" : summary.status === "FAIL" ? "fail" : "na";
+        const statusLabel = summary.status === "PASS" ? "OK" : summary.status === "FAIL" ? "ALERTA" : "—";
+
+        insightsSummaryCardsEl.innerHTML = `
+          <div class="insight-kpi">
+            <div class="label">Status do limite</div>
+            <div class="value"><span class="badge ${statusClass}">${statusLabel}</span></div>
+            <div class="sub">${limitActive ? `${summary.totalExceed} pontos acima do limite` : "Ative um limite para checar automaticamente"}</div>
+          </div>
+          <div class="insight-kpi">
+            <div class="label">Maior excesso</div>
+            <div class="value">${summary.worstMargin != null ? `${formatCompactNumber(summary.worstMargin, 2)} dB` : "—"}</div>
+            <div class="sub">${summary.worstMarginInfo || "—"}</div>
+          </div>
+          <div class="insight-kpi">
+            <div class="label">Maior pico</div>
+            <div class="value">${summary.maxPeak != null ? `${formatCompactNumber(summary.maxPeak, 2)} dBµV` : "—"}</div>
+            <div class="sub">${summary.maxPeakInfo || "—"}</div>
+          </div>
+          <div class="insight-kpi">
+            <div class="label">Picos detectados</div>
+            <div class="value">${summary.totalPeaks}</div>
+            <div class="sub">${filterActive ? "Com filtro de frequência" : "Sem filtro de frequência"}</div>
+          </div>
+        `;
+
+        const fpItems = [];
+        series.forEach((s, idx) => {
+          const p = s.patterns || {};
+          if (!p.harmonics && !p.spacing) return;
+          const parts = [];
+          if (p.harmonics) parts.push(`Harmônicos: fund ${formatCompactNumber(p.harmonics.fundamental, 2)} (${p.harmonics.count})`);
+          if (p.spacing) parts.push(`Espaçamento: Δ ${formatCompactNumber(p.spacing.delta, 2)} (${p.spacing.count})`);
+          fpItems.push(`<div class="insight-item"><div><strong>${escapeHtml(getSeriesLabel(s, idx))}</strong><div>${escapeHtml(parts.join(" · "))}</div></div></div>`);
+        });
+        insightsFingerprintEl.innerHTML = fpItems.length ? fpItems.join("") : "<div class=\"status\">Nenhum padrão marcante detectado.</div>";
+
+        const top = computeTopCriticalPeaks(series, limitActive, 15);
+        if (!top.length) {
+          criticalPeaksEl.innerHTML = "<div class=\"status\">Sem picos para listar.</div>";
+        } else {
+          criticalPeaksEl.innerHTML = `
+            <table class="band-table">
+              <thead>
+                <tr>
+                  <th>Arquivo</th>
+                  <th>Freq (MHz)</th>
+                  <th>Int (dBµV)</th>
+                  <th>Margem (dB)</th>
+                  <th>Δ baseline (dB)</th>
+                  <th>Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${top.map(p => `
+                  <tr>
+                    <td>${escapeHtml(p.label)}</td>
+                    <td>${formatCompactNumber(p.frequency, 2)}</td>
+                    <td>${formatCompactNumber(p.intensity, 2)}</td>
+                    <td>${p.margin == null ? "—" : formatCompactNumber(p.margin, 2)}</td>
+                    <td>${p.delta == null ? "—" : formatCompactNumber(p.delta, 2)}</td>
+                    <td>
+                      <button class="secondary" data-focus="${p.frequency}">Focar</button>
+                      <button class="secondary" data-bookmark="${p.frequency}">Salvar</button>
+                    </td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          `;
+          criticalPeaksEl.querySelectorAll("button[data-focus]").forEach(btn => {
+            btn.addEventListener("click", () => {
+              const f = parseFloat(btn.getAttribute("data-focus") || "");
+              if (!Number.isNaN(f)) focusOnFrequency(f, "Pico crítico");
+            });
+          });
+          criticalPeaksEl.querySelectorAll("button[data-bookmark]").forEach(btn => {
+            btn.addEventListener("click", () => {
+              const f = parseFloat(btn.getAttribute("data-bookmark") || "");
+              if (Number.isNaN(f)) return;
+              const label = prompt("Nome do marcador:", "Pico crítico") || "";
+              if (!label.trim()) return;
+              bookmarks = [...bookmarks, { frequency: f, label: label.trim() }].slice(-200);
+              saveBookmarks();
+              renderBookmarksList();
+              refreshPlots();
+            });
+          });
+        }
+
+        const issues = computeCsvQuality(series);
+        qualityIssuesEl.innerHTML = issues.length
+          ? issues.map(i => `<div class="insight-item"><div><strong>${escapeHtml(i.label)}</strong><div>${escapeHtml(i.text)}</div></div></div>`).join("")
+          : "<div class=\"status\">Nenhum alerta de qualidade encontrado.</div>";
+
+        const sug = suggestPreset(series);
+        insightSuggestionsEl.innerHTML = `
+          <div class="insight-item">
+            <div>
+              <div><strong>Preset recomendado</strong></div>
+              <div>${escapeHtml(sug.reason)}</div>
+            </div>
+            <div class="insight-actions">
+              <button id="btnApplySuggestedPreset" class="secondary" type="button">Aplicar: ${escapeHtml(sug.preset)}</button>
+            </div>
+          </div>
+        `;
+        const btnApply = document.getElementById("btnApplySuggestedPreset");
+        btnApply?.addEventListener("click", () => {
+          presetSelect.value = sug.preset;
+          applyPreset(sug.preset);
+          refreshPlots();
+        });
+
+        // Trend plot (bar summary)
+        const labels = series.map((s, idx) => formatLabel(getSeriesLabel(s, idx), 18));
+        const maxInt = series.map(s => s.stats?.max ?? 0);
+        const maxMargin = limitActive ? series.map(s => s.limit?.maxMargin ?? 0) : [];
+        const traces = [
+          { type: "bar", x: labels, y: maxInt, name: "Max (dBµV)", marker: { color: "rgba(87,214,255,0.85)" } }
+        ];
+        if (limitActive) {
+          traces.push({
+            type: "bar",
+            x: labels,
+            y: maxMargin,
+            name: "Pior margem (dB)",
+            marker: { color: "rgba(255,107,107,0.7)" },
+            yaxis: "y2"
+          });
+        }
+        const trendLayout = {
+          paper_bgcolor: "#151b23",
+          plot_bgcolor: "#151b23",
+          font: { color: "#e7edf3" },
+          barmode: "group",
+          xaxis: { tickangle: -20, gridcolor: "#1f2a36" },
+          yaxis: { title: "dBµV", gridcolor: "#1f2a36" },
+          margin: { t: 10, l: 50, r: 50, b: 60 },
+          legend: { orientation: "h" }
+        };
+        if (limitActive) trendLayout.yaxis2 = { title: "dB", overlaying: "y", side: "right", showgrid: false };
+        Plotly.newPlot("trendPlot", traces, trendLayout, { responsive: true });
+
+        // Delta heatmap
+        const baseIndex = parseInt(baselineSelect.value || "0", 10);
+        const baseline = series[baseIndex] || null;
+        if (!baseline || series.length < 2) {
+          Plotly.newPlot("deltaHeatmapPlot", [], {
+            paper_bgcolor: "#151b23",
+            plot_bgcolor: "#151b23",
+            font: { color: "#e7edf3" },
+            xaxis: { visible: false },
+            yaxis: { visible: false },
+            annotations: [{ text: "Selecione 2+ medições para ver Δ vs baseline.", xref: "paper", yref: "paper", x: 0.5, y: 0.5, showarrow: false, font: { color: "rgba(150,163,173,0.95)" } }]
+          }, { responsive: true });
+        } else {
+          const bins = Math.max(120, Math.min(900, parseInt(heatmapBins.value || "320", 10) || 320));
+          const minFreq = Math.min(...series.map(s => s.frequency[0] || 0));
+          const maxFreq = Math.max(...series.map(s => s.frequency[s.frequency.length - 1] || 0));
+          const step = (maxFreq - minFreq) / (bins - 1);
+          const freqGrid = Array.from({ length: bins }, (_, i) => minFreq + i * step);
+          const baseZ = resampleSeries(baseline, freqGrid);
+          const other = series
+            .map((s, idx) => ({ s, idx }))
+            .filter(({ idx }) => idx !== baseIndex);
+          const yLabels = other.map(({ s, idx }) => formatLabel(getSeriesLabel(s, idx), 18));
+          const z = other.map(({ s }) => {
+            const vals = resampleSeries(s, freqGrid);
+            return vals.map((v, i) => v - baseZ[i]);
+          });
+          Plotly.newPlot("deltaHeatmapPlot", [{
+            type: "heatmap",
+            x: freqGrid,
+            y: yLabels,
+            z,
+            colorscale: "RdBu",
+            reversescale: true,
+            zmid: 0,
+            colorbar: { title: "Δ dB" },
+            hovertemplate: `%{y}<br>Freq: %{x:.2f}<br>Δ: %{z:.2f} dB<extra></extra>`
+          }], {
+            paper_bgcolor: "#151b23",
+            plot_bgcolor: "#151b23",
+            font: { color: "#e7edf3" },
+            xaxis: { title: "Frequência", gridcolor: "#1f2a36" },
+            yaxis: { title: "", gridcolor: "#1f2a36" },
+            margin: { t: 10, l: 90, r: 40, b: 45 }
+          }, { responsive: true });
+        }
       }
 
       function renderPatterns(series) {
@@ -915,7 +1826,7 @@
           if (!harmonics && !spacing) return;
           cards.push(`
             <div class="pattern-card">
-              <div><strong>${s.filename || `Medição ${idx + 1}`}</strong></div>
+              <div><strong>${escapeHtml(getSeriesLabel(s, idx))}</strong></div>
               ${harmonics ? `<div>Fundamental: <strong>${harmonics.fundamental.toFixed(2)}</strong> (harmônicos: ${harmonics.count})</div>` : ""}
               ${spacing ? `<div>Espaçamento dominante: <strong>${spacing.delta.toFixed(2)}</strong> (ocorrências: ${spacing.count})</div>` : ""}
             </div>
@@ -1227,7 +2138,7 @@
         const lines = [];
         lines.push(`WaveSight EMC POC - Log`);
         lines.push(`Gerado em: ${new Date().toISOString()}`);
-        lines.push(`Arquivos: ${series.map(s => s.filename || "sem_nome").join(", ")}`);
+        lines.push(`Arquivos: ${series.map((s, idx) => getSeriesLabel(s, idx)).join(", ")}`);
         lines.push(`Total series: ${series.length}`);
         lines.push(`Limit: ${limitEnabled.checked ? `${limitSource.value} (${limitFilename || "ativo"})` : "não"}`);
         lines.push(`Bands: ${bands.length ? bands.map(b => `${b.label}(${b.min}-${b.max})`).join(", ") : "nenhuma"}`);
@@ -1328,7 +2239,7 @@
         if (!bands.length) return "";
         let html = `<table class="band-table"><thead><tr><th>Banda</th>`;
         series.forEach((s, idx) => {
-          html += `<th>${s.filename || `M${idx + 1}`}</th>`;
+          html += `<th>${escapeHtml(getSeriesLabel(s, idx))}</th>`;
         });
         html += `</tr></thead><tbody>`;
         bands.forEach(band => {
@@ -1352,6 +2263,211 @@
         return html;
       }
 
+      function escapeHtml(text) {
+        return String(text ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function getSeriesLabel(seriesItem, idx) {
+        const base = seriesItem.filename || `Medição ${idx + 1}`;
+        return seriesItem.axis ? `Eixo ${seriesItem.axis} — ${base}` : base;
+      }
+
+      function formatCompactNumber(value, decimals = 2) {
+        if (value == null || Number.isNaN(value)) return "—";
+        const factor = 10 ** decimals;
+        const rounded = Math.round(value * factor) / factor;
+        const asString = rounded.toFixed(decimals);
+        return asString.replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
+      }
+
+      function getPrimaryRe310Detector(requirement) {
+        if (requirement?.pk?.limit != null) return "PK";
+        if (requirement?.av?.limit != null) return "AV";
+        if (requirement?.qp?.limit != null) return "QP";
+        return null;
+      }
+
+      function analyzeSeriesRange(seriesItem, min, max, limitValue) {
+        let count = 0;
+        let sum = 0;
+        let maxValue = -Infinity;
+        let maxFreq = null;
+        let exceedances = 0;
+        let maxMargin = -Infinity;
+
+        for (let i = 0; i < seriesItem.frequency.length; i++) {
+          const f = seriesItem.frequency[i];
+          if (f < min || f > max) continue;
+          const v = seriesItem.intensity[i];
+          count += 1;
+          sum += v;
+          if (v > maxValue) {
+            maxValue = v;
+            maxFreq = f;
+          }
+          if (limitValue != null) {
+            const margin = v - limitValue;
+            if (margin > 0) exceedances += 1;
+            if (margin > maxMargin) maxMargin = margin;
+          }
+        }
+
+        if (!count) {
+          return {
+            hasData: false,
+            count: 0,
+            mean: null,
+            max: null,
+            maxFreq: null,
+            margin: null,
+            exceedances: null,
+            maxMargin: null,
+            topPeaks: []
+          };
+        }
+
+        const peaks = [...(seriesItem.peaks || [])]
+          .filter(p => p.frequency >= min && p.frequency <= max)
+          .sort((a, b) => b.intensity - a.intensity)
+          .slice(0, 5);
+
+        return {
+          hasData: true,
+          count,
+          mean: sum / count,
+          max: maxValue,
+          maxFreq,
+          margin: limitValue != null ? maxValue - limitValue : null,
+          exceedances: limitValue != null ? exceedances : null,
+          maxMargin: limitValue != null ? maxMargin : null,
+          topPeaks: peaks
+        };
+      }
+
+      function buildRe310ResultCellHtml(requirement, series) {
+        const primaryDetector = getPrimaryRe310Detector(requirement);
+        if (!primaryDetector) {
+          return `<span class="result-pill result-na">N/A</span>`;
+        }
+
+        const primary = requirement[primaryDetector.toLowerCase()];
+        const primaryLimit = primary?.limit ?? null;
+
+        let worst = null;
+        let worstFilename = "";
+        series.forEach((s, idx) => {
+          const analysis = analyzeSeriesRange(s, requirement.min, requirement.max, primaryLimit);
+          if (!analysis.hasData) return;
+          if (!worst || (analysis.max != null && analysis.max > worst.max)) {
+            worst = analysis;
+            worstFilename = getSeriesLabel(s, idx);
+          }
+        });
+
+        if (!worst || !worst.hasData) return "—";
+
+        const marginPrimary = worst.margin;
+        const status = marginPrimary == null ? "N/A" : (marginPrimary <= 0 ? "PASS" : "FAIL");
+        const statusClass = status === "PASS" ? "result-pass" : (status === "FAIL" ? "result-fail" : "result-na");
+
+        const marginPk = requirement.pk?.limit != null ? (worst.max - requirement.pk.limit) : null;
+        const marginAv = requirement.av?.limit != null ? (worst.max - requirement.av.limit) : null;
+        const marginQp = requirement.qp?.limit != null ? (worst.max - requirement.qp.limit) : null;
+        const marginsLine = [
+          requirement.pk?.limit != null ? `PK ${formatCompactNumber(marginPk, 1)} dB` : null,
+          requirement.av?.limit != null ? `AV ${formatCompactNumber(marginAv, 1)} dB` : null,
+          requirement.qp?.limit != null ? `QP ${formatCompactNumber(marginQp, 1)} dB` : null
+        ].filter(Boolean).join(" | ");
+
+        const peaksLine = worst.topPeaks.length
+          ? worst.topPeaks.map(p => `${formatCompactNumber(p.frequency, 2)}: ${formatCompactNumber(p.intensity, 1)}`).join(", ")
+          : "—";
+
+        return `
+          <div class="re310-result">
+            <div>
+              <span class="result-pill ${statusClass}">${status}</span>
+              <span class="muted">detector ref.: ${primaryDetector}</span>
+            </div>
+            <div>Max: <strong>${formatCompactNumber(worst.max, 1)}</strong> @ <strong>${formatCompactNumber(worst.maxFreq, 2)}</strong> MHz</div>
+            <div>Média: ${formatCompactNumber(worst.mean, 1)} (${worst.count} pts)</div>
+            ${primaryLimit != null ? `<div>Limite (${primaryDetector}): ${formatCompactNumber(primaryLimit, 1)} → margem ${formatCompactNumber(marginPrimary, 1)} dB | exced.: ${worst.exceedances}</div>` : ""}
+            ${marginsLine ? `<div>Margens vs limites: ${marginsLine}</div>` : ""}
+            <div>Arquivo: ${escapeHtml(worstFilename)}</div>
+            <div>Top picos (na faixa): ${peaksLine}</div>
+          </div>
+        `.trim();
+      }
+
+      function buildRe310TableHtml(series) {
+        if (!series || !series.length) return "";
+        const header = `
+          <thead>
+            <tr>
+              <th rowspan="2">Test ID</th>
+              <th rowspan="2">Description (Band)</th>
+              <th rowspan="2">Frequency Range<br/>(MHz)</th>
+              <th colspan="2">PK</th>
+              <th colspan="2">AV</th>
+              <th colspan="2">QP</th>
+              <th rowspan="2">Resultado (CSV)</th>
+            </tr>
+            <tr>
+              <th>BW<br/>(kHz)</th>
+              <th>(dBµV/m)</th>
+              <th>BW<br/>(kHz)</th>
+              <th>(dBµV/m)</th>
+              <th>BW<br/>(kHz)</th>
+              <th>(dBµV/m)</th>
+            </tr>
+          </thead>
+        `.trim();
+
+        const rows = RE310_LEVEL2_REQUIREMENTS.map(req => {
+          if (req.type === "group") {
+            return `<tr class="re310-group"><td colspan="10">${escapeHtml(req.label)}</td></tr>`;
+          }
+
+          const range = `${formatCompactNumber(req.min, 2)}-${formatCompactNumber(req.max, 2)}`;
+          const pkBw = req.pk?.bw_khz != null ? String(req.pk.bw_khz) : "—";
+          const pkLim = req.pk?.limit != null ? String(req.pk.limit) : "—";
+          const avBw = req.av?.bw_khz != null ? String(req.av.bw_khz) : "—";
+          const avLim = req.av?.limit != null ? String(req.av.limit) : "—";
+          const qpBw = req.qp?.bw_khz != null ? String(req.qp.bw_khz) : "—";
+          const qpLim = req.qp?.limit != null ? String(req.qp.limit) : "—";
+          const resultHtml = buildRe310ResultCellHtml(req, series);
+
+          return `
+            <tr>
+              <td><strong>${escapeHtml(req.id)}</strong></td>
+              <td>${escapeHtml(req.description)}</td>
+              <td>${range}</td>
+              <td class="num">${pkBw}</td>
+              <td class="num">${pkLim}</td>
+              <td class="num">${avBw}</td>
+              <td class="num">${avLim}</td>
+              <td class="num">${qpBw}</td>
+              <td class="num">${qpLim}</td>
+              <td>${resultHtml}</td>
+            </tr>
+          `.trim();
+        }).join("\n");
+
+        return `
+          <table class="re310-table">
+            ${header}
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        `.trim();
+      }
+
       function updateBaselineOptions(series) {
         const current = baselineSelect.value;
         baselineSelect.innerHTML = "";
@@ -1359,7 +2475,7 @@
         series.forEach((s, idx) => {
           const opt = document.createElement("option");
           opt.value = String(idx);
-          opt.textContent = s.filename || `Medição ${idx + 1}`;
+          opt.textContent = getSeriesLabel(s, idx);
           baselineSelect.appendChild(opt);
         });
         if (current && parseInt(current, 10) < series.length) {
@@ -1408,7 +2524,7 @@
 
           rows.push(`
             <tr>
-              <td>${s.filename || `Medição ${idx + 1}`}</td>
+              <td>${escapeHtml(getSeriesLabel(s, idx))}</td>
               <td>${stats.min.toFixed(2)}</td>
               <td>${stats.max.toFixed(2)}</td>
               <td>${stats.mean.toFixed(2)}</td>
@@ -1442,68 +2558,474 @@
         `;
       }
 
-      function render2D(series) {
-        const traces = [];
+      function hexToRgba(hex, alpha) {
+        const clean = (hex || "").replace("#", "");
+        if (clean.length !== 6) return `rgba(87,214,255,${alpha})`;
+        const r = parseInt(clean.slice(0, 2), 16);
+        const g = parseInt(clean.slice(2, 4), 16);
+        const b = parseInt(clean.slice(4, 6), 16);
+        return `rgba(${r},${g},${b},${alpha})`;
+      }
 
-        updateLimitSeries();
-        series.forEach((s, idx) => {
-          const color = colors[idx % colors.length];
-          traces.push({
-            x: s.frequency,
-            y: s.intensity,
-            mode: "lines",
-            name: s.filename || `Medição ${idx + 1}`,
-            line: { color, width: 2 }
-          });
-
-          const peaks = s.peaks || [];
-          if (showPeaks.checked && peaks.length) {
-            traces.push({
-              x: peaks.map(p => p.frequency),
-              y: peaks.map(p => p.intensity),
-              mode: "markers",
-              name: `Picos - ${s.filename || `M${idx + 1}`}`,
-              marker: { color, size: 6, symbol: "circle-open" }
-            });
-          }
-
-          if (s.exceedPoints && s.exceedPoints.length) {
-            traces.push({
-              x: s.exceedPoints.map(p => p.frequency),
-              y: s.exceedPoints.map(p => p.intensity),
-              mode: "markers",
-              name: `Excedeu limite - ${s.filename || `M${idx + 1}`}`,
-              marker: { color: "#ff6b6b", size: 6, symbol: "x" }
-            });
-          }
-        });
-
-        if (limitEnabled.checked && limitSeries) {
-          const limitDecimated = decimateArray(
-            limitSeries.frequency,
-            limitSeries.intensity.map(v => v + (parseFloat(limitMargin.value || "0") || 0)),
-            Math.max(200, Math.min(20000, parseInt(maxPoints.value || "5000", 10)))
-          );
-          traces.push({
-            x: limitDecimated.xs,
-            y: limitDecimated.ys,
-            mode: "lines",
-            name: "Limite",
-            line: { color: "#ff6b6b", width: 2, dash: "dash" }
-          });
-        }
-
+      function renderPlot2dMessage(message) {
         const layout = {
           paper_bgcolor: "#151b23",
           plot_bgcolor: "#151b23",
           font: { color: "#e7edf3" },
-          xaxis: { title: "Frequência", gridcolor: "#1f2a36" },
-          yaxis: { title: "Intensidade (dBµV)", gridcolor: "#1f2a36" },
+          xaxis: { visible: false },
+          yaxis: { visible: false },
+          margin: { t: 10, l: 10, r: 10, b: 10 },
+          annotations: [
+            {
+              text: message,
+              xref: "paper",
+              yref: "paper",
+              x: 0.5,
+              y: 0.5,
+              showarrow: false,
+              font: { size: 14, color: "rgba(150,163,173,0.95)" }
+            }
+          ]
+        };
+        Plotly.newPlot("plot2d", [], layout, { responsive: true });
+        attachPlot2dListeners();
+      }
+
+      function attachPlot2dListeners() {
+        const plotEl = document.getElementById("plot2d");
+        if (!plotEl || typeof plotEl.on !== "function") return;
+        try {
+          plotEl.removeAllListeners("plotly_relayout");
+          plotEl.removeAllListeners("plotly_click");
+        } catch (_err) {}
+
+        plotEl.on("plotly_relayout", ev => {
+          if (!ev || typeof ev !== "object") return;
+
+          if (ev["xaxis.autorange"]) {
+            plot2dView = { ...plot2dView, xRange: null };
+            return;
+          }
+
+          const r0 = ev["xaxis.range[0]"] ?? (Array.isArray(ev["xaxis.range"]) ? ev["xaxis.range"][0] : null);
+          const r1 = ev["xaxis.range[1]"] ?? (Array.isArray(ev["xaxis.range"]) ? ev["xaxis.range"][1] : null);
+          const x0 = typeof r0 === "string" ? parseFloat(r0) : r0;
+          const x1 = typeof r1 === "string" ? parseFloat(r1) : r1;
+          if (Number.isFinite(x0) && Number.isFinite(x1)) {
+            plot2dView = { ...plot2dView, xRange: [x0, x1] };
+          }
+        });
+
+        plotEl.on("plotly_click", ev => {
+          const point = ev?.points?.[0];
+          const x = point?.x;
+          if (!Number.isFinite(x)) return;
+          plot2dView = { ...plot2dView, focusFreq: x, label: "Selecionado no gráfico" };
+          refreshPlots();
+        });
+      }
+
+      function getSeriesXRange(series) {
+        let min = Infinity;
+        let max = -Infinity;
+        series.forEach(s => {
+          (s.frequency || []).forEach(f => {
+            if (!Number.isFinite(f)) return;
+            if (f < min) min = f;
+            if (f > max) max = f;
+          });
+        });
+        if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+        return { min, max };
+      }
+
+      function buildPlot2dOverlays(series) {
+        const range = getSeriesXRange(series);
+        if (!range) return { shapes: [], annotations: [] };
+
+        const shapes = [];
+        const annotations = [];
+        const xMin = range.min;
+        const xMax = range.max;
+
+        function addBandRect(min, max, fill, stroke) {
+          const x0 = Math.max(xMin, min);
+          const x1 = Math.min(xMax, max);
+          if (!(x1 > x0)) return;
+          shapes.push({
+            type: "rect",
+            xref: "x",
+            yref: "paper",
+            x0,
+            x1,
+            y0: 0,
+            y1: 1,
+            fillcolor: fill,
+            line: { color: stroke, width: 1 }
+          });
+        }
+
+        if (showCommonBands.checked) {
+          COMMON_BANDS.forEach(b => {
+            addBandRect(b.min, b.max, "rgba(87,214,255,0.035)", "rgba(87,214,255,0.06)");
+          });
+          (bands || []).forEach(b => {
+            addBandRect(b.min, b.max, "rgba(0,212,164,0.045)", "rgba(0,212,164,0.10)");
+            if (b.label) {
+              const cx = Math.max(xMin, Math.min(xMax, (b.min + b.max) / 2));
+              annotations.push({
+                xref: "x",
+                yref: "paper",
+                x: cx,
+                y: 1,
+                yanchor: "bottom",
+                text: escapeHtml(String(b.label)),
+                showarrow: false,
+                font: { size: 10, color: "rgba(150,163,173,0.9)" }
+              });
+            }
+          });
+        }
+
+        if (showHarmonics2d.checked) {
+          const baseIndex = parseInt(baselineSelect.value || "0", 10);
+          const refSeries = series[baseIndex] || series[0];
+          const harmonics = refSeries?.patterns?.harmonics;
+          const matches = Array.isArray(harmonics?.matches) ? harmonics.matches : [];
+          matches
+            .filter(m => Number.isFinite(m?.frequency) && m.frequency >= xMin && m.frequency <= xMax)
+            .slice(0, 12)
+            .forEach(m => {
+              shapes.push({
+                type: "line",
+                xref: "x",
+                yref: "paper",
+                x0: m.frequency,
+                x1: m.frequency,
+                y0: 0,
+                y1: 1,
+                line: { color: "rgba(140,123,255,0.28)", width: 1, dash: "dot" }
+              });
+              annotations.push({
+                xref: "x",
+                yref: "paper",
+                x: m.frequency,
+                y: 1,
+                yanchor: "bottom",
+                text: `H${m.n}`,
+                showarrow: false,
+                font: { size: 10, color: "rgba(140,123,255,0.9)" }
+              });
+            });
+        }
+
+        const focusFreq = plot2dView?.focusFreq;
+        if (Number.isFinite(focusFreq) && focusFreq >= xMin && focusFreq <= xMax) {
+          shapes.push({
+            type: "line",
+            xref: "x",
+            yref: "paper",
+            x0: focusFreq,
+            x1: focusFreq,
+            y0: 0,
+            y1: 1,
+            line: { color: "rgba(87,214,255,0.65)", width: 2 }
+          });
+          if (plot2dView?.label) {
+            annotations.push({
+              xref: "x",
+              yref: "paper",
+              x: focusFreq,
+              y: 0,
+              yanchor: "top",
+              text: escapeHtml(String(plot2dView.label)),
+              showarrow: false,
+              font: { size: 10, color: "rgba(87,214,255,0.95)" }
+            });
+          }
+        }
+
+        const visibleBookmarks = (bookmarks || [])
+          .filter(b => Number.isFinite(b?.frequency) && b.frequency >= xMin && b.frequency <= xMax)
+          .slice()
+          .sort((a, b) => a.frequency - b.frequency)
+          .slice(0, 18);
+        visibleBookmarks.forEach(b => {
+          shapes.push({
+            type: "line",
+            xref: "x",
+            yref: "paper",
+            x0: b.frequency,
+            x1: b.frequency,
+            y0: 0,
+            y1: 1,
+            line: { color: "rgba(0,212,164,0.35)", width: 1, dash: "dash" }
+          });
+          if (b.label) {
+            annotations.push({
+              xref: "x",
+              yref: "paper",
+              x: b.frequency,
+              y: 0,
+              yanchor: "top",
+              text: escapeHtml(String(b.label)),
+              showarrow: false,
+              font: { size: 10, color: "rgba(0,212,164,0.9)" }
+            });
+          }
+        });
+
+        return { shapes, annotations };
+      }
+
+      function render2D(series) {
+        const traces = [];
+        updateLimitSeries();
+        const mode = plot2dMode.value || "lines";
+
+        const hasLimit = limitEnabled.checked && !!limitSeries;
+        const limitMarginDb = parseFloat(limitMargin.value || "0") || 0;
+
+        function addPeakTraces(s, idx, color, label) {
+          const peaks = s.peaks || [];
+          if (!showPeaks.checked || !peaks.length) return;
+
+          traces.push({
+            x: peaks.map(p => p.frequency),
+            y: peaks.map(p => p.intensity),
+            mode: "markers",
+            name: `Picos - ${label}`,
+            marker: { color, size: 6, symbol: "circle-open" },
+            hovertemplate: `${label}<br>Pico: %{x:.2f}<br>Int: %{y:.2f} dBµV<extra></extra>`,
+            showlegend: false
+          });
+
+          if (!showPeakLabels.checked) return;
+          const topN = Math.max(1, Math.min(30, parseInt(peakLabelCount.value || "5", 10) || 5));
+          const topPeaks = peaks.slice().sort((a, b) => b.intensity - a.intensity).slice(0, topN);
+          traces.push({
+            x: topPeaks.map(p => p.frequency),
+            y: topPeaks.map(p => p.intensity),
+            mode: "markers+text",
+            text: topPeaks.map(p => `${p.frequency.toFixed(1)}`),
+            textposition: "top center",
+            textfont: { size: 10, color: "rgba(231,237,243,0.92)" },
+            marker: { color, size: 6, symbol: "circle" },
+            name: `Etiquetas - ${label}`,
+            hovertemplate: `${label}<br>Pico: %{x:.2f}<br>Int: %{y:.2f} dBµV<extra></extra>`,
+            showlegend: false
+          });
+        }
+
+        function resampleSeriesNullable(seriesItem, freqGrid) {
+          const xs = seriesItem.frequency;
+          const ys = seriesItem.intensity;
+          return freqGrid.map(f => interpolateAt(xs, ys, f));
+        }
+
+        if (mode === "heatmap") {
+          if (!series.length) return;
+          const bins = Math.max(80, Math.min(1200, parseInt(heatmapBins.value || "320", 10) || 320));
+          const minFreq = Math.min(...series.map(s => s.frequency[0] || 0));
+          const maxFreq = Math.max(...series.map(s => s.frequency[s.frequency.length - 1] || 0));
+          const step = (maxFreq - minFreq) / (bins - 1);
+          const freqGrid = Array.from({ length: bins }, (_, i) => minFreq + i * step);
+          const z = series.map(s => resampleSeries(s, freqGrid));
+          const yLabels = series.map((s, idx) => formatLabel(getSeriesLabel(s, idx), 18));
+          traces.push({
+            type: "heatmap",
+            x: freqGrid,
+            y: yLabels,
+            z,
+            colorscale: "Turbo",
+            zsmooth: "best",
+            colorbar: { title: "dBµV" },
+            hovertemplate: `%{y}<br>Freq: %{x:.2f}<br>Int: %{z:.2f} dBµV<extra></extra>`
+          });
+        } else if (mode === "envelope_max" || mode === "envelope_mean" || mode === "envelope_min") {
+          if (!series.length) return;
+          const bins = Math.max(160, Math.min(1200, parseInt(heatmapBins.value || "320", 10) || 320));
+          const minFreq = Math.min(...series.map(s => s.frequency[0] || 0));
+          const maxFreq = Math.max(...series.map(s => s.frequency[s.frequency.length - 1] || 0));
+          const step = (maxFreq - minFreq) / (bins - 1);
+          const freqGrid = Array.from({ length: bins }, (_, i) => minFreq + i * step);
+          const samples = series.map(s => resampleSeriesNullable(s, freqGrid));
+
+          if (series.length > 1) {
+            series.forEach((s, idx) => {
+              const color = colors[idx % colors.length];
+              const label = getSeriesLabel(s, idx);
+              traces.push({
+                x: s.frequency,
+                y: s.intensity,
+                mode: "lines",
+                name: label,
+                line: { color: hexToRgba(color, 0.35), width: 1 },
+                hovertemplate: `${label}<br>Freq: %{x:.2f}<br>Int: %{y:.2f} dBµV<extra></extra>`,
+                showlegend: false
+              });
+              addPeakTraces(s, idx, color, label);
+            });
+          }
+
+          const env = freqGrid.map((_, i) => {
+            const vals = samples.map(row => row[i]).filter(v => v !== null && !Number.isNaN(v));
+            if (!vals.length) return null;
+            if (mode === "envelope_max") return Math.max(...vals);
+            if (mode === "envelope_min") return Math.min(...vals);
+            return vals.reduce((acc, v) => acc + v, 0) / vals.length;
+          });
+
+          const label = mode === "envelope_max" ? "Envelope (máx)" : mode === "envelope_min" ? "Envelope (mín)" : "Envelope (média)";
+          const color = mode === "envelope_min" ? "#8c7bff" : mode === "envelope_mean" ? "#00d4a4" : "#57d6ff";
+          traces.push({
+            x: freqGrid,
+            y: env,
+            mode: "lines",
+            name: label,
+            line: { color, width: 3 },
+            hovertemplate: `${label}<br>Freq: %{x:.2f}<br>Int: %{y:.2f} dBµV<extra></extra>`
+          });
+        } else if (mode === "delta") {
+          if (series.length < 2) {
+            renderPlot2dMessage("Selecione 2+ medições para usar Δ vs baseline.");
+            return;
+          }
+          const baseIndex = parseInt(baselineSelect.value || "0", 10);
+          const baseline = series[baseIndex];
+          if (!baseline) return;
+          traces.push({
+            x: baseline.frequency,
+            y: baseline.frequency.map(() => 0),
+            mode: "lines",
+            name: "Baseline (0)",
+            line: { color: "rgba(150,163,173,0.65)", width: 1, dash: "dot" },
+            hoverinfo: "skip"
+          });
+          series.forEach((s, idx) => {
+            if (idx === baseIndex) return;
+            const color = colors[idx % colors.length];
+            const label = getSeriesLabel(s, idx);
+            const deltas = baseline.frequency.map((f, i) => {
+              const val = interpolateAt(s.frequency, s.intensity, f);
+              return val === null ? null : val - baseline.intensity[i];
+            });
+            const xs = baseline.frequency;
+            traces.push({
+              x: xs,
+              y: deltas,
+              mode: "lines",
+              name: `Δ ${label}`,
+              line: { color, width: 2 },
+              hovertemplate: `${label}<br>Freq: %{x:.2f}<br>Δ: %{y:.2f} dB<extra></extra>`
+            });
+          });
+        } else if (mode === "margin") {
+          if (!hasLimit) {
+            renderPlot2dMessage("Ative um limite para ver a margem (Limites & normas → Usar limite).");
+            return;
+          }
+          const limitYs = limitSeries.intensity.map(v => v + limitMarginDb);
+          traces.push({
+            x: limitSeries.frequency,
+            y: limitSeries.frequency.map(() => 0),
+            mode: "lines",
+            name: "Limite (0)",
+            line: { color: "rgba(150,163,173,0.65)", width: 1, dash: "dot" },
+            hoverinfo: "skip"
+          });
+          series.forEach((s, idx) => {
+            const color = colors[idx % colors.length];
+            const label = getSeriesLabel(s, idx);
+            const margins = s.frequency.map((f, i) => {
+              const lim = interpolateAt(limitSeries.frequency, limitYs, f);
+              return lim === null ? null : s.intensity[i] - lim;
+            });
+            const xs = s.frequency;
+            traces.push({
+              x: xs,
+              y: margins,
+              mode: "lines",
+              name: `Margem - ${label}`,
+              line: { color, width: 2 },
+              hovertemplate: `${label}<br>Freq: %{x:.2f}<br>Margem: %{y:.2f} dB<extra></extra>`
+            });
+          });
+        } else {
+          series.forEach((s, idx) => {
+            const color = colors[idx % colors.length];
+            const label = getSeriesLabel(s, idx);
+            const traceMode = mode === "points" ? "markers" : mode === "lines_points" ? "lines+markers" : "lines";
+            const trace = {
+              x: s.frequency,
+              y: s.intensity,
+              mode: traceMode,
+              name: label,
+              line: { color, width: 2 },
+              hovertemplate: `${label}<br>Freq: %{x:.2f}<br>Int: %{y:.2f} dBµV<extra></extra>`
+            };
+            if (traceMode.includes("markers")) trace.marker = { color, size: 4 };
+            if (mode === "area") {
+              trace.fill = "tozeroy";
+              trace.fillcolor = hexToRgba(color, 0.12);
+            }
+            traces.push(trace);
+
+            addPeakTraces(s, idx, color, label);
+
+            if (s.exceedPoints && s.exceedPoints.length) {
+              traces.push({
+                x: s.exceedPoints.map(p => p.frequency),
+                y: s.exceedPoints.map(p => p.intensity),
+                mode: "markers",
+                name: `Excedeu limite - ${label}`,
+                marker: { color: "#ff6b6b", size: 6, symbol: "x" },
+                hovertemplate: `${label}<br>Freq: %{x:.2f}<br>Int: %{y:.2f} dBµV<extra></extra>`
+              });
+            }
+          });
+
+          if (hasLimit) {
+            const limitDecimated = decimateArray(
+              limitSeries.frequency,
+              limitSeries.intensity.map(v => v + limitMarginDb),
+              Math.max(200, Math.min(20000, parseInt(maxPoints.value || "5000", 10)))
+            );
+            traces.push({
+              x: limitDecimated.xs,
+              y: limitDecimated.ys,
+              mode: "lines",
+              name: "Limite",
+              line: { color: "#ff6b6b", width: 2, dash: "dash" },
+              hovertemplate: `Limite<br>Freq: %{x:.2f}<br>Int: %{y:.2f} dBµV<extra></extra>`
+            });
+          }
+        }
+
+        const yTitle = mode === "delta" ? "Δ Intensidade (dB)" : mode === "margin" ? "Margem (dB)" : "Intensidade (dBµV)";
+        const overlays = buildPlot2dOverlays(series);
+        const layout = {
+          paper_bgcolor: "#151b23",
+          plot_bgcolor: "#151b23",
+          font: { color: "#e7edf3" },
+          xaxis: { title: "Frequência", gridcolor: "#1f2a36", showspikes: true, spikemode: "across", spikecolor: "rgba(87,214,255,0.22)" },
+          yaxis: { title: yTitle, gridcolor: "#1f2a36", zeroline: mode === "delta" || mode === "margin", zerolinecolor: "rgba(150,163,173,0.35)" },
           margin: { t: 10, l: 50, r: 20, b: 45 },
           legend: { orientation: "h" }
         };
 
+        if (plot2dView?.xRange && plot2dView.xRange.length === 2) {
+          const x0 = plot2dView.xRange[0];
+          const x1 = plot2dView.xRange[1];
+          if (Number.isFinite(x0) && Number.isFinite(x1) && x1 > x0) {
+            layout.xaxis.range = [x0, x1];
+          }
+        }
+        if (overlays.shapes.length) layout.shapes = overlays.shapes;
+        if (overlays.annotations.length) layout.annotations = overlays.annotations;
+
         Plotly.newPlot("plot2d", traces, layout, { responsive: true });
+        attachPlot2dListeners();
       }
 
       function resampleSeries(series, freqGrid) {
@@ -1527,8 +3049,44 @@
         const traces = [];
         const tickvals = [];
         const ticktext = [];
+        const scale = colorscale3d.value || "Turbo";
+        const showContours = !!showContours3d.checked;
+        const showLimit = !!showLimit3d.checked;
+        const cameraPreset = camera3d.value || "iso";
+        const hasLimit = limitEnabled.checked && !!limitSeries;
+        const limitMarginDb = parseFloat(limitMargin.value || "0") || 0;
 
-        if (mode === "surface" && series.length > 1) {
+        function getCamera(preset) {
+          switch (preset) {
+            case "top":
+              return { eye: { x: 0, y: 0, z: 2.2 } };
+            case "front":
+              return { eye: { x: 0, y: 2.2, z: 0.2 } };
+            case "side":
+              return { eye: { x: 2.2, y: 0.2, z: 0.2 } };
+            default:
+              return { eye: { x: 1.4, y: 1.4, z: 0.9 } };
+          }
+        }
+
+        function pushLimitLines(freqGrid, limitZ) {
+          series.forEach((s, idx) => {
+            traces.push({
+              type: "scatter3d",
+              mode: "lines",
+              x: freqGrid,
+              y: freqGrid.map(() => idx),
+              z: limitZ,
+              name: "Limite",
+              line: { color: "rgba(255,107,107,0.65)", width: 2 },
+              hovertemplate: `Limite<br>Freq: %{x:.2f}<br>Int: %{z:.2f} dBµV<extra></extra>`,
+              showlegend: idx === 0
+            });
+          });
+        }
+
+        const isSurface = mode === "surface" || mode === "surface_lines";
+        if (isSurface && series.length > 1) {
           const bins = Math.max(50, Math.min(800, parseInt(bins3d.value || "200", 10)));
           const minFreq = Math.min(...series.map(s => s.frequency[0] || 0));
           const maxFreq = Math.max(...series.map(s => s.frequency[s.frequency.length - 1] || 0));
@@ -1541,31 +3099,121 @@
             x: freqGrid,
             y,
             z,
-            colorscale: "Viridis",
+            colorscale: scale,
             showscale: true
           });
+          if (showContours) {
+            traces[0].contours = {
+              z: { show: true, usecolormap: true, project: { z: true } }
+            };
+          }
           series.forEach((s, idx) => {
             tickvals.push(idx);
-            ticktext.push(formatLabel(s.filename || `Medição ${idx + 1}`));
+            ticktext.push(formatLabel(getSeriesLabel(s, idx)));
           });
+
+          if (mode === "surface_lines") {
+            series.forEach((s, idx) => {
+              const color = colors[idx % colors.length];
+              traces.push({
+                type: "scatter3d",
+                mode: "lines",
+                x: s.frequency,
+                y: s.frequency.map(() => idx),
+                z: s.intensity,
+                name: formatLabel(getSeriesLabel(s, idx)),
+                line: { color: hexToRgba(color, 0.85), width: 3 },
+                hovertemplate: `${getSeriesLabel(s, idx)}<br>Freq: %{x:.2f}<br>Int: %{z:.2f} dBµV<extra></extra>`,
+                showlegend: false
+              });
+            });
+          }
+
+          if (showLimit && hasLimit) {
+            const limitZ = freqGrid.map(f => {
+              const val = interpolateAt(limitSeries.frequency, limitSeries.intensity.map(v => v + limitMarginDb), f);
+              return val === null ? 0 : val;
+            });
+            pushLimitLines(freqGrid, limitZ);
+          }
         } else {
           series.forEach((s, idx) => {
             const color = colors[idx % colors.length];
             const y = s.frequency.map(() => idx);
-            const label = formatLabel(s.filename || `Medição ${idx + 1}`);
-            traces.push({
+            const fullLabel = getSeriesLabel(s, idx);
+            const label = formatLabel(fullLabel);
+            const traceMode =
+              mode === "points" || mode === "points_intensity"
+                ? "markers"
+                : mode === "lines_points" || mode === "lines_points_intensity"
+                  ? "lines+markers"
+                  : "lines";
+
+            const trace = {
               type: "scatter3d",
-              mode: "lines",
+              mode: traceMode,
               x: s.frequency,
               y,
               z: s.intensity,
               name: label,
-              line: { color, width: 3 },
-              hovertemplate: `${s.filename || label}<br>Freq: %{x:.2f}<br>Int: %{z:.2f} dBµV<extra></extra>`
-            });
+              hovertemplate: `${fullLabel}<br>Freq: %{x:.2f}<br>Int: %{z:.2f} dBµV<extra></extra>`
+            };
+            if (traceMode.includes("lines")) trace.line = { color, width: 3 };
+            if (traceMode.includes("markers")) {
+              if (mode === "points_intensity" || mode === "lines_points_intensity") {
+                trace.marker = {
+                  size: 3,
+                  color: s.intensity,
+                  colorscale: scale,
+                  showscale: idx === 0,
+                  ...(idx === 0 ? { colorbar: { title: "dBµV" } } : {})
+                };
+              } else {
+                trace.marker = { color, size: 2.8 };
+              }
+            }
+            traces.push(trace);
+
+            if (showPeaks.checked && (s.peaks || []).length) {
+              traces.push({
+                type: "scatter3d",
+                mode: "markers",
+                x: s.peaks.map(p => p.frequency),
+                y: s.peaks.map(() => idx),
+                z: s.peaks.map(p => p.intensity),
+                name: `Picos - ${label}`,
+                marker: { color, size: 3, symbol: "circle-open" },
+                hovertemplate: `${fullLabel}<br>Pico: %{x:.2f}<br>Int: %{z:.2f} dBµV<extra></extra>`
+              });
+            }
+            if (s.exceedPoints && s.exceedPoints.length) {
+              traces.push({
+                type: "scatter3d",
+                mode: "markers",
+                x: s.exceedPoints.map(p => p.frequency),
+                y: s.exceedPoints.map(() => idx),
+                z: s.exceedPoints.map(p => p.intensity),
+                name: `Excedeu limite - ${label}`,
+                marker: { color: "#ff6b6b", size: 3, symbol: "x" },
+                hovertemplate: `${fullLabel}<br>Freq: %{x:.2f}<br>Int: %{z:.2f} dBµV<extra></extra>`
+              });
+            }
             tickvals.push(idx);
             ticktext.push(label);
           });
+
+          if (showLimit && hasLimit && series.length) {
+            const bins = Math.max(50, Math.min(800, parseInt(bins3d.value || "200", 10)));
+            const minFreq = Math.min(...series.map(s => s.frequency[0] || 0));
+            const maxFreq = Math.max(...series.map(s => s.frequency[s.frequency.length - 1] || 0));
+            const step = (maxFreq - minFreq) / (bins - 1);
+            const freqGrid = Array.from({ length: bins }, (_, i) => minFreq + i * step);
+            const limitZ = freqGrid.map(f => {
+              const val = interpolateAt(limitSeries.frequency, limitSeries.intensity.map(v => v + limitMarginDb), f);
+              return val === null ? 0 : val;
+            });
+            pushLimitLines(freqGrid, limitZ);
+          }
         }
 
         const layout = {
@@ -1574,7 +3222,7 @@
             xaxis: { title: "Frequência" },
             yaxis: { title: "", tickvals, ticktext, tickfont: { size: 10 } },
             zaxis: { title: "Intensidade (dBµV)" },
-            camera: { eye: { x: 1.4, y: 1.4, z: 0.9 } }
+            camera: getCamera(cameraPreset)
           },
           showlegend: true,
           legend: { orientation: "h" },
@@ -1583,6 +3231,11 @@
         };
 
         Plotly.newPlot("plot3d", traces, layout, { responsive: true });
+        requestAnimationFrame(() => {
+          try {
+            Plotly.Plots.resize(document.getElementById("plot3d"));
+          } catch (_err) {}
+        });
       }
 
       function normalizeWindow(method, value) {
@@ -1654,13 +3307,15 @@
         if (!lastSeries.length) return;
         updateLimitSeries();
         const processed = getProcessedSeries();
+        updateBaselineOptions(processed.series);
         const plotSeries = decimateSeries(processed.series);
         render2D(plotSeries);
         renderStats(processed.series, processed.filterActive, processed.limitActive);
         renderPatterns(processed.series);
         bandStatsEl.innerHTML = computeBandStats(processed.series);
-        updateBaselineOptions(processed.series);
         computeComparison(processed.series);
+        renderAdvancedInsights(processed.series, processed.filterActive, processed.limitActive);
+        renderBookmarksList();
         if (show3d) render3D(plotSeries);
       }
 
@@ -1714,7 +3369,7 @@
         lines.push(`Gerado em: ${timestamp}`);
         lines.push("");
         series.forEach((s, idx) => {
-          lines.push(`Medição ${idx + 1}: ${s.filename || "sem_nome"}`);
+          lines.push(getSeriesLabel(s, idx));
           lines.push(`Amostras: ${s.count}`);
           lines.push(`Min: ${s.stats.min.toFixed(2)} dBµV`);
           lines.push(`Max: ${s.stats.max.toFixed(2)} dBµV`);
@@ -1730,9 +3385,10 @@
 
       function buildReportHtml(series, imageDataUrl) {
         const timestamp = new Date().toLocaleString();
+        const re310TableHtml = buildRe310TableHtml(series);
         const rows = series.map((s, idx) => `
           <tr>
-            <td>${s.filename || `Medição ${idx + 1}`}</td>
+            <td>${escapeHtml(getSeriesLabel(s, idx))}</td>
             <td>${s.count}</td>
             <td>${s.stats.min.toFixed(2)}</td>
             <td>${s.stats.max.toFixed(2)}</td>
@@ -1751,6 +3407,7 @@
           "Freq min": freqMin.value || "—",
           "Freq max": freqMax.value || "—",
           "Mostrar picos": showPeaks.checked ? "sim" : "não",
+          "Gráfico 2D": plot2dMode.value,
           "Fonte limite": limitSource.value,
           "Curva limite": limitEnabled.checked ? (limitFilename || "ativa") : "não",
           "Norma": normSelect.value !== "none" ? (normSelect.options[normSelect.selectedIndex]?.textContent || normSelect.value) : "—",
@@ -1774,7 +3431,7 @@
           if (!harmonics && !spacing) return "";
           return `
             <tr>
-              <td>${s.filename || `Medição ${idx + 1}`}</td>
+              <td>${escapeHtml(getSeriesLabel(s, idx))}</td>
               <td>${harmonics ? harmonics.fundamental.toFixed(2) : "—"}</td>
               <td>${harmonics ? harmonics.count : "—"}</td>
               <td>${spacing ? spacing.delta.toFixed(2) : "—"}</td>
@@ -1788,11 +3445,11 @@
         const legend = series.map((s, idx) => `
           <span style="display:inline-flex;align-items:center;gap:6px;margin-right:12px;">
             <span style="width:10px;height:10px;background:${colors[idx % colors.length]};display:inline-block;border-radius:2px;"></span>
-            ${s.filename || `Medição ${idx + 1}`}
+            ${escapeHtml(getSeriesLabel(s, idx))}
           </span>
         `).join("");
 
-        const filesLine = series.map(s => s.filename || "sem_nome").join(", ");
+        const filesLine = escapeHtml(series.map((s, idx) => getSeriesLabel(s, idx)).join(", "));
         return `
 <!doctype html>
 <html lang="pt-br">
@@ -1809,6 +3466,8 @@
       th { background: #f2f2f2; }
       img { max-width: 100%; border: 1px solid #ddd; margin-top: 8px; }
       .footer { margin-top: 18px; font-size: 11px; color: #666; }
+      .muted { color: #555; font-size: 10px; }
+      .note { margin-top: 10px; color: #444; font-size: 11px; }
       .cover {
         border: 1px solid #ddd;
         padding: 24px;
@@ -1818,7 +3477,28 @@
       .cover h1 { font-size: 26px; margin: 0; }
       .cover .subtitle { color: #444; }
       .page-break { page-break-after: always; }
+      .re310-table { font-size: 11px; }
+      .re310-table th, .re310-table td { padding: 4px 6px; }
+      .re310-table th { text-align: center; background: #e6e6e6; }
+      .re310-table td { vertical-align: top; }
+      .re310-table td.num { text-align: center; white-space: nowrap; }
+      .re310-group td { background: #d9d9d9; font-weight: 700; }
+      .re310-result { font-size: 11px; line-height: 1.25; }
+      .result-pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid #ccc;
+        font-weight: 700;
+        font-size: 11px;
+        margin-right: 8px;
+      }
+      .result-pass { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+      .result-fail { background: #ffebee; border-color: #ef9a9a; color: #b71c1c; }
+      .result-na { background: #eee; border-color: #ccc; color: #444; }
+      thead { display: table-header-group; }
       @media print {
+        @page { size: A4 landscape; margin: 12mm; }
         .page-break { page-break-after: always; }
       }
     </style>
@@ -1830,6 +3510,14 @@
       <div>Gerado em: ${timestamp}</div>
       <div>Arquivos: ${filesLine}</div>
       <div>Total de medições: ${series.length}</div>
+    </div>
+    <div class="page-break"></div>
+    <h1>Table 7-2: RE 310 Level 2 Requirements</h1>
+    <div class="meta">Tabela no padrão JLR (com avaliação automática a partir do CSV)</div>
+    <div class="section">
+      ${re310TableHtml}
+      <div class="note">Level 2 requirements are based on specific customer requirements.</div>
+      <div class="note"><span class="muted">Obs:</span> o cálculo de PASS/FAIL usa como referência o detector disponível na ordem <strong>PK → AV → QP</strong> por banda e considera o pior caso entre os arquivos na mesma faixa (ex.: eixos X/Y/Z).</div>
     </div>
     <div class="page-break"></div>
     <h1>Resumo Técnico</h1>
@@ -1986,7 +3674,8 @@
           setStatus("Faca login para processar arquivos.", "error");
           return;
         }
-        const files = Array.from(fileInput.files || []);
+        const selections = getSelectedFilesDetailed();
+        const files = selections.map(s => s.file);
         if (!files.length) {
           setStatus("Selecione pelo menos um CSV.", "error");
           return;
@@ -1996,12 +3685,13 @@
         setLoading(true);
         btnUpload.disabled = true;
         btn3d.disabled = true;
+        btn3dChart.disabled = true;
         btnReport.disabled = true;
         btnReportPdf.disabled = true;
 
         try {
           const form = new FormData();
-          files.forEach(file => form.append("files", file));
+          selections.forEach(({ file }) => form.append("files", file));
 
           const query = buildQueryParams();
           const res = await fetch(`${API_URL}/upload-multi?${query}`, {
@@ -2018,7 +3708,18 @@
 
           const payload = await res.json();
           const series = payload.series ? payload.series : [payload];
+          if (selections.some(s => s.axis) && series.length === selections.length) {
+            series.forEach((s, idx) => {
+              const axis = selections[idx].axis;
+              if (axis) s.axis = axis;
+            });
+          }
           lastSeries = series;
+
+          // Render AI Insights
+          renderAiInsights(payload.ai_insights, series);
+          // Render Revision Comparison
+          renderRevisionComparison(payload.revision_comparison);
 
           if (limitPreset.value && limitPreset.value !== "none") {
             applyLimitPreset();
@@ -2027,6 +3728,7 @@
           }
           setStatus("OK", "ok");
           btn3d.disabled = false;
+          btn3dChart.disabled = false;
           btnReport.disabled = false;
           btnReportPdf.disabled = false;
         } catch (err) {
@@ -2037,26 +3739,250 @@
         }
       }
 
+      /* ── AI Insights Rendering ──────────────────────────── */
+      function renderAiInsights(aiInsights, series) {
+        const badge = document.getElementById('aiBadge');
+        const body = document.getElementById('aiInsightsBody');
+        const emBadge = document.getElementById('aiEmissionBadge');
+
+        // Emission type badge
+        const emType = series?.[0]?.emission_type;
+        if (emType && emType !== 'indeterminate') {
+          const labels = { narrowband: '🎯 Narrowband', broadband: '📡 Broadband', mixed: '🔀 Mixed' };
+          emBadge.innerHTML = `<span class="emission-badge ${emType}">${labels[emType] || emType}</span>`;
+        } else {
+          emBadge.innerHTML = '';
+        }
+
+        if (aiInsights) {
+          badge.className = 'ai-badge ai-active';
+          badge.textContent = '✨ Análise com IA';
+          // Simple markdown-like rendering
+          let html = aiInsights
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/^### (.+)$/gm, '<h4 style="color:var(--accent);margin:12px 0 6px;">$1</h4>')
+            .replace(/^## (.+)$/gm, '<h3 style="color:var(--accent);margin:14px 0 8px;">$1</h3>')
+            .replace(/^- (.+)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>');
+          body.innerHTML = `<p>${html}</p>`;
+        } else {
+          badge.className = 'ai-badge ai-inactive';
+          badge.textContent = 'Análise sem IA';
+          body.innerHTML = '<div class="ai-hint">Nenhum provider de IA configurado. O processamento funcionou normalmente.<br>Configure <code>AI_PROVIDER</code> e <code>AI_API_KEY</code> para diagnósticos automáticos.</div>';
+        }
+      }
+
+      /* ── Revision Comparison Rendering ──────────────────── */
+      function renderRevisionComparison(comparison) {
+        const section = document.getElementById('revisionComparisonSection');
+        const body = document.getElementById('revisionComparisonBody');
+        if (!comparison) { section.style.display = 'none'; return; }
+        section.style.display = '';
+
+        let html = '';
+        if (comparison.new_emissions?.length) {
+          html += '<div class="rev-title">🔴 Novas emissões</div>';
+          comparison.new_emissions.forEach(e => {
+            html += `<div class="revision-item rev-new"><span>${e.freq_mhz?.toFixed(2)} MHz</span><span>${e.intensity_dbuv?.toFixed(1)} dBµV (${e.file})</span></div>`;
+          });
+        }
+        if (comparison.removed_emissions?.length) {
+          html += '<div class="rev-title" style="margin-top:10px">🟢 Emissões removidas</div>';
+          comparison.removed_emissions.forEach(e => {
+            html += `<div class="revision-item rev-removed"><span>${e.freq_mhz?.toFixed(2)} MHz</span><span>${e.intensity_dbuv?.toFixed(1)} dBµV</span></div>`;
+          });
+        }
+        if (comparison.significant_deltas?.length) {
+          html += '<div class="rev-title" style="margin-top:10px">🟡 Deltas significativos (>6 dB)</div>';
+          comparison.significant_deltas.forEach(e => {
+            const sign = e.delta_db > 0 ? '+' : '';
+            html += `<div class="revision-item rev-delta"><span>${e.freq_mhz?.toFixed(2)} MHz</span><span>${sign}${e.delta_db} dB (${e.file})</span></div>`;
+          });
+        }
+        if (!html) { section.style.display = 'none'; return; }
+        body.innerHTML = html;
+      }
+
+      /* ── Saved Analyses & Projects ──────────────────────── */
+      let activeProjectId = null;
+
+      async function loadSidebarProjects() {
+        if (!authToken) return;
+        try {
+          const res = await fetch(`${API_URL}/projects`, { headers: getAuthHeaders() });
+          if (!res.ok) return;
+          const projects = await res.json();
+          const list = document.getElementById('sidebarProjectsList');
+          if (!projects.length) { list.innerHTML = '<li class="empty">Nenhum projeto</li>'; return; }
+          list.innerHTML = projects.map(p => {
+            const isActive = activeProjectId === p.id;
+            return `<li data-pid="${p.id}" style="${isActive ? 'background:rgba(87,214,255,0.1);color:var(--text)' : ''}" title="Clique para ${isActive ? 'deselecionar' : 'filtrar análises'}">
+              <span>${p.name} <span style="color:var(--muted);font-size:10px">(${p.analysis_count})</span></span>
+              <span class="sidebar-del" data-del-pid="${p.id}" title="Deletar projeto" style="cursor:pointer;opacity:0.4;font-size:9px;margin-left:4px">✕</span>
+            </li>`;
+          }).join('');
+          // Click to select/filter
+          list.querySelectorAll('li[data-pid]').forEach(li => {
+            li.addEventListener('click', (e) => {
+              if (e.target.closest('.sidebar-del')) return;
+              const pid = parseInt(li.dataset.pid);
+              activeProjectId = activeProjectId === pid ? null : pid;
+              loadSidebarProjects();
+              loadSidebarAnalyses();
+            });
+          });
+          // Delete buttons
+          list.querySelectorAll('.sidebar-del').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              const pid = parseInt(btn.dataset.delPid);
+              if (!confirm('Deletar projeto? Todas as análises associadas serão removidas.')) return;
+              await fetch(`${API_URL}/projects/${pid}`, { method: 'DELETE', headers: getAuthHeaders() });
+              if (activeProjectId === pid) activeProjectId = null;
+              loadSidebarProjects();
+              loadSidebarAnalyses();
+            });
+          });
+        } catch(e) {}
+      }
+
+      async function loadSidebarAnalyses() {
+        if (!authToken) return;
+        try {
+          let url = `${API_URL}/analyses?limit=15`;
+          if (activeProjectId) url += `&project_id=${activeProjectId}`;
+          const res = await fetch(url, { headers: getAuthHeaders() });
+          if (!res.ok) return;
+          const analyses = await res.json();
+          const list = document.getElementById('sidebarAnalysesList');
+          const filterLabel = activeProjectId ? ' (filtrado)' : '';
+          if (!analyses.length) {
+            list.innerHTML = `<li class="empty">Nenhuma análise${filterLabel}</li>`;
+            return;
+          }
+          list.innerHTML = analyses.map(a => {
+            const date = a.created_at ? new Date(a.created_at).toLocaleDateString('pt-BR') : '';
+            return `<li title="${a.filename} — ${date}">
+              <span>${a.filename} <span style="color:var(--muted);font-size:10px">${date}</span></span>
+              <span class="sidebar-del" data-del-aid="${a.id}" title="Deletar" style="cursor:pointer;opacity:0.4;font-size:9px;margin-left:4px">✕</span>
+            </li>`;
+          }).join('');
+          // Delete analysis
+          list.querySelectorAll('.sidebar-del').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              const aid = parseInt(btn.dataset.delAid);
+              await fetch(`${API_URL}/analyses/${aid}`, { method: 'DELETE', headers: getAuthHeaders() });
+              loadSidebarAnalyses();
+              loadSidebarProjects();
+            });
+          });
+        } catch(e) {}
+      }
+
+      document.getElementById('btnNewProject').addEventListener('click', async () => {
+        const name = prompt('Nome do projeto:');
+        if (!name) return;
+        try {
+          await fetch(`${API_URL}/projects`, {
+            method: 'POST', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description: '' })
+          });
+          loadSidebarProjects();
+        } catch(e) {}
+      });
+
+      document.getElementById('btnSaveAnalysis').addEventListener('click', async () => {
+        if (!lastSeries?.length) { setStatus('Nenhuma análise para salvar.', 'error'); return; }
+        const fname = lastSeries.map(s => s.filename).join(', ');
+        const body = { filename: fname, results_json: JSON.stringify(lastSeries) };
+        if (activeProjectId) body.project_id = activeProjectId;
+        try {
+          await fetch(`${API_URL}/analyses`, {
+            method: 'POST', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          setStatus(`Análise salva!${activeProjectId ? ' (no projeto selecionado)' : ''}`, 'ok');
+          loadSidebarAnalyses();
+          loadSidebarProjects();
+        } catch(e) { setStatus('Erro ao salvar', 'error'); }
+      });
+
+      // Load sidebar data after login
+      const origLoginUser = loginUser;
+      const origRegisterUser = registerUser;
+
       btnUpload.addEventListener("click", upload);
-      btnRegister.addEventListener("click", registerUser);
-      btnLogin.addEventListener("click", loginUser);
+      authSwitchBtn.addEventListener("click", () => setAuthMode(authMode === "register" ? "login" : "register"));
+      btnAuthSubmit.addEventListener("click", () => {
+        if (authMode === "register") return registerUser();
+        return loginUser();
+      });
       btnLogout.addEventListener("click", logoutUser);
       authPassword.addEventListener("keydown", event => {
-        if (event.key === "Enter") loginUser();
+        if (event.key === "Enter") btnAuthSubmit.click();
       });
       btnReport.addEventListener("click", downloadReport);
       btnReportPdf.addEventListener("click", printReportPdf);
       btnExportImage.addEventListener("click", exportImage);
-      btn3d.addEventListener("click", () => {
+      function toggle3dPanel() {
         if (!lastSeries.length) return;
         show3d = !show3d;
         panel3d.style.display = show3d ? "block" : "none";
-        if (show3d) refreshPlots();
-      });
+        btn3d.textContent = show3d ? "Fechar 3D" : "Abrir 3D";
+        btn3dChart.textContent = show3d ? "Fechar 3D" : "Abrir 3D";
+        if (show3d) {
+          requestAnimationFrame(() => {
+            refreshPlots();
+            setTimeout(() => {
+              try {
+                Plotly.Plots.resize(document.getElementById("plot3d"));
+              } catch (_err) {}
+            }, 50);
+          });
+        }
+      }
+      btn3d.addEventListener("click", toggle3dPanel);
+      btn3dChart.addEventListener("click", toggle3dPanel);
       presetSelect.addEventListener("change", () => applyPreset(presetSelect.value));
       showPeaks.addEventListener("change", refreshPlots);
+      showCommonBands.addEventListener("change", refreshPlots);
+      showHarmonics2d.addEventListener("change", refreshPlots);
+      showPeakLabels.addEventListener("change", refreshPlots);
+      peakLabelCount.addEventListener("change", refreshPlots);
+      plot2dMode.addEventListener("change", refreshPlots);
+      heatmapBins.addEventListener("change", refreshPlots);
       maxPoints.addEventListener("change", refreshPlots);
       baselineSelect.addEventListener("change", refreshPlots);
+
+      btnAddBookmark.addEventListener("click", () => {
+        const defaultFreq = plot2dView?.focusFreq;
+        let frequency = defaultFreq;
+        if (!Number.isFinite(frequency)) {
+          const raw = prompt("Frequência do marcador (MHz):", "");
+          if (raw == null) return;
+          frequency = parseFloat(String(raw).replace(",", "."));
+        }
+        if (!Number.isFinite(frequency)) return;
+        const defaultLabel = plot2dView?.label || "Marcador";
+        const label = prompt("Nome do marcador:", defaultLabel) || "";
+        if (!label.trim()) return;
+        bookmarks = [...bookmarks, { frequency, label: label.trim() }].slice(-200);
+        saveBookmarks();
+        renderBookmarksList();
+        refreshPlots();
+      });
+
+      btnClearBookmarks.addEventListener("click", () => {
+        const ok = confirm("Remover todos os marcadores salvos?");
+        if (!ok) return;
+        bookmarks = [];
+        saveBookmarks();
+        renderBookmarksList();
+        refreshPlots();
+      });
       [freqMin, freqMax].forEach(input => {
         input.addEventListener("change", () => {
           refreshPlots();
@@ -2130,10 +4056,26 @@
       bins3d.addEventListener("change", () => {
         if (show3d) refreshPlots();
       });
+      colorscale3d.addEventListener("change", () => {
+        if (show3d) refreshPlots();
+      });
+      showContours3d.addEventListener("change", () => {
+        if (show3d) refreshPlots();
+      });
+      showLimit3d.addEventListener("change", () => {
+        if (show3d) refreshPlots();
+      });
+      camera3d.addEventListener("change", () => {
+        if (show3d) refreshPlots();
+      });
       btnClear.addEventListener("click", () => {
         fileInput.value = "";
+        fileInputX.value = "";
+        fileInputY.value = "";
+        fileInputZ.value = "";
         fileList.innerHTML = "";
         lastSeries = [];
+        plot2dView = { xRange: null, focusFreq: null };
         limitSeries = null;
         limitFilename = null;
         limitFileSeries = null;
@@ -2152,24 +4094,90 @@
         patternsEl.innerHTML = "";
         bandStatsEl.innerHTML = "";
         statsEl.innerHTML = "";
+        renderAdvancedInsights([], false, false);
         setStatus("", "loading");
         btn3d.disabled = true;
+        btn3dChart.disabled = true;
         btnReport.disabled = true;
         btnReportPdf.disabled = true;
+        show3d = false;
+        panel3d.style.display = "none";
+        btn3d.textContent = "Abrir 3D";
+        btn3dChart.textContent = "Abrir 3D";
         Plotly.newPlot("plot2d", [], { paper_bgcolor: "#151b23", plot_bgcolor: "#151b23" }, { responsive: true });
-        if (show3d) Plotly.newPlot("plot3d", [], { paper_bgcolor: "#151b23" }, { responsive: true });
+        Plotly.newPlot("plot3d", [], { paper_bgcolor: "#151b23" }, { responsive: true });
+        renderBookmarksList();
+        updateAxisChips();
       });
 
-      function updateFileList() {
+      function updateAxisChips() {
+        const fx = fileInputX.files && fileInputX.files[0];
+        const fy = fileInputY.files && fileInputY.files[0];
+        const fz = fileInputZ.files && fileInputZ.files[0];
+        axisFileX.textContent = fx ? `X: ${fx.name}` : "X: —";
+        axisFileY.textContent = fy ? `Y: ${fy.name}` : "Y: —";
+        axisFileZ.textContent = fz ? `Z: ${fz.name}` : "Z: —";
+      }
+
+      function clearAxisInputs() {
+        fileInputX.value = "";
+        fileInputY.value = "";
+        fileInputZ.value = "";
+        updateAxisChips();
+      }
+
+      function getAxisSelections() {
+        const selections = [];
+        const fx = fileInputX.files && fileInputX.files[0];
+        const fy = fileInputY.files && fileInputY.files[0];
+        const fz = fileInputZ.files && fileInputZ.files[0];
+        if (fx) selections.push({ axis: "X", file: fx });
+        if (fy) selections.push({ axis: "Y", file: fy });
+        if (fz) selections.push({ axis: "Z", file: fz });
+        return selections;
+      }
+
+      function getSelectedFilesDetailed() {
+        const axisSelections = getAxisSelections();
+        if (axisSelections.length) return axisSelections;
         const files = Array.from(fileInput.files || []);
-        if (!files.length) {
+        return files.map(file => ({ axis: null, file }));
+      }
+
+      function updateFileList() {
+        updateAxisChips();
+        const selections = getSelectedFilesDetailed();
+        if (!selections.length) {
           fileList.innerHTML = "";
           return;
         }
-        fileList.innerHTML = files.map(file => `<span class="file-chip">${file.name}</span>`).join("");
+        fileList.innerHTML = selections.map(({ axis, file }) => {
+          const prefix = axis ? `${axis}: ` : "";
+          return `<span class="file-chip">${escapeHtml(prefix + file.name)}</span>`;
+        }).join("");
       }
 
-      fileInput.addEventListener("change", updateFileList);
+      btnPickX.addEventListener("click", () => fileInputX.click());
+      btnPickY.addEventListener("click", () => fileInputY.click());
+      btnPickZ.addEventListener("click", () => fileInputZ.click());
+
+      fileInputX.addEventListener("change", () => {
+        if (fileInputX.files && fileInputX.files.length) fileInput.value = "";
+        updateFileList();
+      });
+      fileInputY.addEventListener("change", () => {
+        if (fileInputY.files && fileInputY.files.length) fileInput.value = "";
+        updateFileList();
+      });
+      fileInputZ.addEventListener("change", () => {
+        if (fileInputZ.files && fileInputZ.files.length) fileInput.value = "";
+        updateFileList();
+      });
+
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files && fileInput.files.length) clearAxisInputs();
+        updateFileList();
+      });
       dropzone.addEventListener("dragover", event => {
         event.preventDefault();
         dropzone.classList.add("dragover");
@@ -2180,15 +4188,399 @@
         dropzone.classList.remove("dragover");
         if (event.dataTransfer?.files?.length) {
           fileInput.files = event.dataTransfer.files;
+          clearAxisInputs();
           updateFileList();
         }
       });
 
+      /* ── 4-View SPA Router ──────────────────────────────── */
+      const dashboardEl = document.getElementById('dashboardHome');
+      const toolPanelsEl = document.getElementById('toolPanels');
+      const viewProjectsEl = document.getElementById('viewProjects');
+      const viewSettingsEl = document.getElementById('viewSettings');
+      const viewReportsEl = document.getElementById('viewReports');
+      let currentView = 'dashboard';
+
+      function switchView(view) {
+        currentView = view;
+        // Hide all views
+        dashboardEl.classList.remove('active');
+        toolPanelsEl.classList.add('hidden-by-dash');
+        viewProjectsEl.classList.remove('active');
+        viewSettingsEl.classList.remove('active');
+        viewReportsEl.classList.remove('active');
+        // Show target
+        switch(view) {
+          case 'dashboard':
+            dashboardEl.classList.add('active');
+            updateDashboardStats();
+            if (currentUser) document.getElementById('dashUserName').textContent = currentUser.name || currentUser.email;
+            break;
+          case 'tool':
+            toolPanelsEl.classList.remove('hidden-by-dash');
+            break;
+          case 'projects':
+            viewProjectsEl.classList.add('active');
+            renderProjectsView();
+            break;
+          case 'settings':
+            viewSettingsEl.classList.add('active');
+            populateSettings();
+            break;
+          case 'reports':
+            viewReportsEl.classList.add('active');
+            renderReportsView();
+            break;
+        }
+        // Update active nav link
+        document.querySelectorAll('.nav-view-link').forEach(a => {
+          const isActive = a.dataset.view === view;
+          a.style.color = isActive ? 'var(--accent)' : '';
+          a.style.fontWeight = isActive ? '600' : '';
+        });
+        window.scrollTo(0, 0);
+      }
+
+      // Sidebar nav view links
+      document.querySelectorAll('.nav-view-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          switchView(link.dataset.view);
+        });
+      });
+
+      // Dashboard card clicks
+      document.querySelectorAll('.dash-card[data-goto]').forEach(card => {
+        card.addEventListener('click', () => {
+          const target = card.dataset.goto;
+          if (target === 'settings') { switchView('settings'); return; }
+          if (target === 'projects') { switchView('projects'); return; }
+          if (target === 'reports') { switchView('reports'); return; }
+          if (target === 'demo') {
+            switchView('tool');
+            fetch(`${API_URL}/demo`).then(r => r.json()).then(data => {
+              if (data.series) { lastSeries = data.series; refreshPlots(); setStatus('Demo carregado!', 'ok'); }
+            }).catch(() => setStatus('Erro ao carregar demo', 'error'));
+            return;
+          }
+          // upload, insights, aiInsightsSection → go to tool and scroll
+          switchView('tool');
+          setTimeout(() => {
+            const el = document.getElementById(target);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 100);
+        });
+      });
+
+      async function updateDashboardStats() {
+        try {
+          const [projRes, analRes] = await Promise.all([
+            fetch(`${API_URL}/projects`, { headers: getAuthHeaders() }),
+            fetch(`${API_URL}/analyses?limit=999`, { headers: getAuthHeaders() })
+          ]);
+          if (projRes.ok) {
+            const projects = await projRes.json();
+            document.getElementById('dashStatProjects').textContent = projects.length;
+          }
+          if (analRes.ok) {
+            const analyses = await analRes.json();
+            document.getElementById('dashStatAnalyses').textContent = analyses.length;
+          }
+          document.getElementById('dashStatAi').textContent = 'Off';
+        } catch(e) {}
+      }
+
+      /* ── Projects View ──────────────────────────────────── */
+      async function renderProjectsView() {
+        const grid = document.getElementById('projectsGrid');
+        const detail = document.getElementById('projectDetail');
+        detail.style.display = 'none';
+        try {
+          const res = await fetch(`${API_URL}/projects`, { headers: getAuthHeaders() });
+          if (!res.ok) { grid.innerHTML = '<div class="proj-empty"><div class="proj-empty-icon">📁</div>Erro ao carregar projetos.</div>'; return; }
+          const projects = await res.json();
+          if (!projects.length) {
+            grid.innerHTML = '<div class="proj-empty"><div class="proj-empty-icon">📁</div>Nenhum projeto criado.<br>Clique em <strong>+ Novo projeto</strong> para começar.</div>';
+            return;
+          }
+          grid.innerHTML = projects.map(p => {
+            const date = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '';
+            return `<div class="proj-card" data-proj-id="${p.id}">
+              <div class="proj-name">${p.name}</div>
+              <div class="proj-desc">${p.description || 'Sem descrição'}</div>
+              <div class="proj-meta">
+                <span class="proj-count">${p.analysis_count} análise${p.analysis_count !== 1 ? 's' : ''}</span>
+                <span>${date}</span>
+                <span class="proj-del" data-del-id="${p.id}" title="Deletar projeto">🗑️</span>
+              </div>
+            </div>`;
+          }).join('');
+          // Click to view detail
+          grid.querySelectorAll('.proj-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+              if (e.target.closest('.proj-del')) return;
+              showProjectDetail(parseInt(card.dataset.projId));
+            });
+          });
+          // Delete
+          grid.querySelectorAll('.proj-del').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              if (!confirm('Deletar este projeto e todas as análises?')) return;
+              await fetch(`${API_URL}/projects/${btn.dataset.delId}`, { method: 'DELETE', headers: getAuthHeaders() });
+              renderProjectsView();
+              loadSidebarProjects();
+            });
+          });
+        } catch(e) { grid.innerHTML = '<div class="proj-empty">Erro de conexão.</div>'; }
+      }
+
+      async function showProjectDetail(projectId) {
+        const detail = document.getElementById('projectDetail');
+        try {
+          const [projRes, analRes] = await Promise.all([
+            fetch(`${API_URL}/projects`, { headers: getAuthHeaders() }),
+            fetch(`${API_URL}/analyses?limit=999&project_id=${projectId}`, { headers: getAuthHeaders() })
+          ]);
+          const projects = await projRes.json();
+          const project = projects.find(p => p.id === projectId);
+          const analyses = analRes.ok ? await analRes.json() : [];
+          if (!project) return;
+          const date = project.created_at ? new Date(project.created_at).toLocaleDateString('pt-BR') : '';
+          let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3>📁 ${project.name}</h3>
+            <button class="secondary" onclick="document.getElementById('projectDetail').style.display='none'" style="font-size:11px;padding:4px 10px;">✕ Fechar</button>
+          </div>
+          <div class="proj-detail-meta">${project.description || 'Sem descrição'} · Criado em ${date}</div>`;
+          if (!analyses.length) {
+            html += '<p style="color:var(--muted);font-size:12px;">Nenhuma análise neste projeto. Use "💾 Salvar análise atual" na sidebar após processar um CSV.</p>';
+          } else {
+            html += '<ul class="proj-analyses-list">';
+            analyses.forEach(a => {
+              const aDate = a.created_at ? new Date(a.created_at).toLocaleDateString('pt-BR') : '';
+              html += `<li>
+                <span>${a.filename}</span>
+                <span style="display:flex;gap:10px;align-items:center;">
+                  <span style="color:var(--muted);font-size:10px;">${aDate}</span>
+                  <span class="proj-del" data-del-anal="${a.id}" style="cursor:pointer;opacity:0.4;font-size:11px;" title="Deletar">🗑️</span>
+                </span>
+              </li>`;
+            });
+            html += '</ul>';
+          }
+          detail.innerHTML = html;
+          detail.style.display = '';
+          // Delete analysis from detail
+          detail.querySelectorAll('[data-del-anal]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              await fetch(`${API_URL}/analyses/${btn.dataset.delAnal}`, { method: 'DELETE', headers: getAuthHeaders() });
+              showProjectDetail(projectId);
+              loadSidebarProjects();
+              loadSidebarAnalyses();
+            });
+          });
+        } catch(e) {}
+      }
+
+      document.getElementById('btnNewProjectView').addEventListener('click', async () => {
+        const name = prompt('Nome do projeto:');
+        if (!name) return;
+        const desc = prompt('Descrição (opcional):') || '';
+        await fetch(`${API_URL}/projects`, {
+          method: 'POST', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, description: desc })
+        });
+        renderProjectsView();
+        loadSidebarProjects();
+      });
+
+      /* ── Reports View ──────────────────────────────────── */
+      let _allReports = [];
+
+      function getEmissionBadge(type) {
+        const t = (type || '').toLowerCase();
+        if (t.includes('narrow')) return '<span class="emission-badge narrowband">🟢 Narrowband</span>';
+        if (t.includes('broad')) return '<span class="emission-badge broadband">🟡 Broadband</span>';
+        if (t.includes('mix')) return '<span class="emission-badge mixed">🔴 Mixed</span>';
+        return '<span class="emission-badge unknown">— N/A</span>';
+      }
+
+      async function renderReportsView() {
+        const wrap = document.getElementById('reportsTableWrap');
+        document.getElementById('reportDetailPage').style.display = 'none';
+        try {
+          const res = await fetch(`${API_URL}/analyses?limit=200`, { headers: getAuthHeaders() });
+          if (!res.ok) { wrap.innerHTML = '<div class="reports-empty"><div class="reports-empty-icon">📋</div>Erro ao carregar.</div>'; return; }
+          _allReports = await res.json();
+          filterAndRenderReports();
+        } catch(e) { wrap.innerHTML = '<div class="reports-empty">Erro de conexão.</div>'; }
+      }
+
+      function filterAndRenderReports() {
+        const wrap = document.getElementById('reportsTableWrap');
+        const search = (document.getElementById('reportSearch').value || '').toLowerCase();
+        const filterEm = document.getElementById('reportFilterEmission').value;
+        let reports = _allReports;
+        if (search) reports = reports.filter(r => (r.filename || '').toLowerCase().includes(search));
+        if (filterEm) reports = reports.filter(r => (r.emission_type || '').toLowerCase().includes(filterEm));
+
+        if (!reports.length) {
+          wrap.innerHTML = `<div class="reports-empty"><div class="reports-empty-icon">📋</div>${_allReports.length ? 'Nenhum relatório corresponde ao filtro.' : 'Nenhum relatório gerado.<br>Faça um upload de CSV para gerar automaticamente.'}</div>`;
+          return;
+        }
+        wrap.innerHTML = `<table class="reports-table">
+          <thead><tr>
+            <th>ID</th><th>Arquivo</th><th>Data</th><th>Emissão</th><th>Picos</th><th>Faixa</th><th>Máx (dBµV/m)</th><th>IA</th><th>Ações</th>
+          </tr></thead>
+          <tbody>${reports.map(r => {
+            const date = r.created_at ? new Date(r.created_at).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+            const aiLabel = r.ai_insights ? '<span class="report-badge has-ai">✓ AI</span>' : '<span class="report-badge no-ai">—</span>';
+            return `<tr data-rid="${r.id}" style="cursor:pointer;">
+              <td class="report-id">#${r.id}</td>
+              <td>${r.filename}</td>
+              <td>${date}</td>
+              <td>${getEmissionBadge(r.emission_type)}</td>
+              <td>${r.peak_count != null ? r.peak_count : '—'}</td>
+              <td style="font-size:10px;">${r.freq_range || '—'}</td>
+              <td>${r.max_amplitude != null ? r.max_amplitude : '—'}</td>
+              <td>${aiLabel}</td>
+              <td><div class="report-actions">
+                <button class="btn-view" data-view-id="${r.id}" title="Detalhes">📄 Detalhes</button>
+                <button class="btn-reprocess" data-reproc-id="${r.id}" title="Reprocessar">🔄</button>
+                <button class="btn-delete" data-del-rid="${r.id}" title="Excluir">🗑</button>
+              </div></td>
+            </tr>`;
+          }).join('')}</tbody></table>`;
+
+        // Row click → detail
+        wrap.querySelectorAll('tr[data-rid]').forEach(row => {
+          row.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;
+            showReportDetail(parseInt(row.dataset.rid));
+          });
+        });
+        // Btn detail
+        wrap.querySelectorAll('.btn-view').forEach(btn => {
+          btn.addEventListener('click', () => showReportDetail(parseInt(btn.dataset.viewId)));
+        });
+        // Reprocess
+        wrap.querySelectorAll('.btn-reprocess').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            btn.textContent = '⏳';
+            btn.disabled = true;
+            try {
+              const res = await fetch(`${API_URL}/analyses/${btn.dataset.reprocId}/reprocess`, { method: 'POST', headers: getAuthHeaders() });
+              const data = await res.json();
+              alert(res.ok ? `Reprocessado! ${data.ai_insights ? 'IA respondeu.' : 'Sem IA.'}` : (data.detail || 'Erro'));
+              renderReportsView();
+            } catch(e) { alert('Erro'); btn.textContent = '🔄'; btn.disabled = false; }
+          });
+        });
+        // Delete
+        wrap.querySelectorAll('.btn-delete').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            if (!confirm('Excluir este relatório?')) return;
+            await fetch(`${API_URL}/analyses/${btn.dataset.delRid}`, { method: 'DELETE', headers: getAuthHeaders() });
+            renderReportsView();
+            loadSidebarAnalyses();
+          });
+        });
+      }
+
+      // Search & filter events
+      document.getElementById('reportSearch').addEventListener('input', filterAndRenderReports);
+      document.getElementById('reportFilterEmission').addEventListener('change', filterAndRenderReports);
+
+      async function showReportDetail(id) {
+        const panel = document.getElementById('reportDetailPage');
+        panel.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Carregando...</div>';
+        panel.style.display = '';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        try {
+          const res = await fetch(`${API_URL}/analyses/${id}`, { headers: getAuthHeaders() });
+          if (!res.ok) { panel.innerHTML = '<p style="color:#ff6b6b;">Erro ao carregar.</p>'; return; }
+          const data = await res.json();
+          const date = data.created_at ? new Date(data.created_at).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+          let series = [];
+          try { series = JSON.parse(data.results_json || '[]'); } catch(e) {}
+          const s = series[0] || {};
+          const peakCount = (s.peaks || []).length;
+          const stats = s.stats || {};
+          const freqs = s.freqs || [];
+          const freqRange = freqs.length ? `${freqs[0].toFixed(1)} – ${freqs[freqs.length-1].toFixed(1)} MHz` : '—';
+
+          let html = `<div class="report-detail-header">
+            <h3>📋 Relatório #${data.id} — ${data.filename}</h3>
+            <div style="display:flex;gap:8px;">
+              <button class="secondary" id="rdBtnChart" style="font-size:11px;padding:5px 12px;">📊 Abrir no gráfico</button>
+              <button class="secondary" id="rdBtnPdf" style="font-size:11px;padding:5px 12px;">📄 Baixar PDF</button>
+              <button class="secondary" id="rdBtnClose" style="font-size:11px;padding:5px 12px;">✕ Fechar</button>
+            </div>
+          </div>
+          <div style="margin-bottom:12px;font-size:11px;color:var(--muted);">Criado em ${date} · ${getEmissionBadge(data.emission_type)}</div>
+          <div class="report-detail-stats">
+            <div class="report-detail-stat"><div class="rdv">${peakCount}</div><div class="rdl">Picos</div></div>
+            <div class="report-detail-stat"><div class="rdv">${stats.mean != null ? stats.mean.toFixed(1) : '—'}</div><div class="rdl">Média (dBµV/m)</div></div>
+            <div class="report-detail-stat"><div class="rdv">${stats.max != null ? stats.max.toFixed(1) : '—'}</div><div class="rdl">Máx (dBµV/m)</div></div>
+            <div class="report-detail-stat"><div class="rdv">${stats.min != null ? stats.min.toFixed(1) : '—'}</div><div class="rdl">Mín</div></div>
+            <div class="report-detail-stat"><div class="rdv">${freqRange}</div><div class="rdl">Faixa freq</div></div>
+            <div class="report-detail-stat"><div class="rdv">${series.length}</div><div class="rdl">Arquivos</div></div>
+          </div>`;
+
+          if (data.ai_insights) {
+            html += `<div class="report-ai-card">
+              <div class="ai-title">🤖 Diagnóstico IA</div>
+              <div class="ai-body">${data.ai_insights}</div>
+            </div>`;
+          } else {
+            html += '<div style="padding:12px;background:rgba(150,163,173,0.06);border-radius:8px;font-size:12px;color:var(--muted);">ℹ️ Sem diagnóstico IA. Clique em "🔄 Reprocessar" na tabela para gerar.</div>';
+          }
+          panel.innerHTML = html;
+
+          // Event listeners (proper approach, avoids inline onclick JSON issues)
+          document.getElementById('rdBtnChart').addEventListener('click', () => {
+            lastSeries = series;
+            refreshPlots();
+            setStatus(`Relatório #${data.id} carregado.`, 'ok');
+            switchView('tool');
+          });
+          document.getElementById('rdBtnPdf').addEventListener('click', async () => {
+            lastSeries = series;
+            switchView('tool');
+            refreshPlots();
+            setStatus('Gerando PDF...', 'ok');
+            // Delay to let Plotly render before capturing image
+            await new Promise(r => setTimeout(r, 800));
+            printReportPdf();
+          });
+          document.getElementById('rdBtnClose').addEventListener('click', () => {
+            panel.style.display = 'none';
+          });
+        } catch(e) { panel.innerHTML = '<p style="color:#ff6b6b;">Erro de conexão.</p>'; }
+      }
+
+      /* ── Settings View ──────────────────────────────────── */
+      function populateSettings() {
+        if (currentUser) {
+          document.getElementById('settProfileName').value = currentUser.name || '';
+          document.getElementById('settProfileEmail').value = currentUser.email || '';
+        }
+      }
+
       refreshNormSelectors();
       updateLimitSourceUI();
       renderBandList();
-      loadCurrentUser();
+      loadBookmarks();
+      renderBookmarksList();
+      setAuthMode("login");
+      loadCurrentUser().then(() => {
+        loadSidebarProjects();
+        loadSidebarAnalyses();
+        if (currentUser) switchView('dashboard');
+      });
+      updateAxisChips();
       Plotly.newPlot("plot2d", [], { paper_bgcolor: "#151b23", plot_bgcolor: "#151b23" }, { responsive: true });
+      attachPlot2dListeners();
     </script>
   </body>
 </html>

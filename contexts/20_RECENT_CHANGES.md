@@ -1,25 +1,31 @@
-# Mudancas Recentes
+# Mudanças Recentes
 
-## Ultimo bloco implementado
-- Dockerizacao completa do ambiente local:
-- `db` Postgres em container
-- `api` FastAPI em container
-- `frontend` servido por nginx em container
-- Proxy frontend -> backend via `/api`
-- Inclusao de autenticacao e usuarios:
-- cadastro (`/auth/register`)
-- login (`/auth/login`)
-- sessao atual (`/auth/me`)
-- persistencia da tabela `users` no Postgres
-- protecao dos endpoints `/upload` e `/upload-multi` com JWT
+## Revisão geral do projeto (2026-03-24)
+- Revisão completa de todos os arquivos do projeto (docs, backend, frontend, infra)
+- Atualização dos docs:
+  - `README.md` — reescrito: paths genéricos, seções novas (health, INPUT_CONTRACT, dev local)
+  - `PROJECT_CONTEXT.md` — reescrito: assets, context pack, pendências novas
+  - `contexts/00_PROJECT_OVERVIEW.md` — escopo atualizado com itens faltantes
+  - `contexts/10_CURRENT_STATE.md` — lacunas completas (logo, gitignore, API depreciada, etc.)
+  - `contexts/30_OPEN_DECISIONS.md` — 3 novas decisões (logo/branding, frontend monolítico, JWT storage)
+  - `contexts/40_GENERAL_INSTRUCTIONS.md` — removida linha PowerShell perdida (Test-Path)
+- Gerado relatório completo de revisão com 24 itens categorizados
+
+## Bloco anterior: Dockerização + Autenticação
+- Dockerização completa do ambiente local:
+  - `db` Postgres em container
+  - `api` FastAPI em container
+  - `frontend` servido por nginx em container
+  - Proxy frontend -> backend via `/api`
+- Inclusão de autenticação e usuários:
+  - cadastro (`/auth/register`)
+  - login (`/auth/login`)
+  - sessão atual (`/auth/me`)
+  - persistência da tabela `users` no Postgres
+  - proteção dos endpoints `/upload` e `/upload-multi` com JWT
 - Frontend atualizado com tela de login/cadastro/logout
-- Refino de UX de autenticacao no frontend:
-- login/cadastro em card dedicado (overlay)
-- app bloqueado visualmente ate autenticacao
-- cabecalho com sessao limpa apos login
-- Ajustes de documentacao para novo fluxo dockerizado
 
-## Novos artefatos
+## Novos artefatos (originais)
 - `docker-compose.yml`
 - `.env.example`
 - `.dockerignore`
@@ -31,14 +37,6 @@
 - `api/security.py`
 - `api/__init__.py`
 
-## Arquivos atualizados
-- `api/main.py`
-- `api/requirements.txt`
-- `frontend/index.html`
-- `README.md`
-- `ROADMAP.md`
-- `PROJECT_CONTEXT.md`
-
-## Observacao importante
-- Segredo JWT em `docker-compose.yml` esta em modo desenvolvimento.
+## Observação importante
+- Segredo JWT em `docker-compose.yml` está em modo desenvolvimento.
 - Para uso real, trocar por segredo forte e gerenciado por ambiente seguro.

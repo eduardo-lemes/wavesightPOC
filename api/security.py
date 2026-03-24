@@ -1,14 +1,22 @@
 from datetime import datetime, timedelta, timezone
+import logging
 import os
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+logger = logging.getLogger(__name__)
+
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-secret")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")
+if not SECRET_KEY:
+    logger.warning("JWT_SECRET_KEY not set — using insecure default. Set it in production!")
+    SECRET_KEY = "dev-insecure-default-change-me"
+
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8080").split(",") if o.strip()]
 
 
 def verify_password(plain_password: str, password_hash: str) -> bool:

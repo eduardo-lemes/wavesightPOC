@@ -35,4 +35,3 @@ Se voce estiver continuando este projeto, siga estas regras antes de responder:
 - Validacao executada (quando possivel)
 - Resumo curto de impacto
 - Lista de arquivos alterados
-Test-Path \\.\pipe\docker_engine
