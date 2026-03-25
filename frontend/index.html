@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>WaveSight EMC POC</title>
     <script src="https://cdn.plot.ly/plotly-2.27.1.min.js"></script>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=5" />
   </head>
   <body class="auth-locked">
     <div class="app-shell">
@@ -20,6 +20,7 @@
           <a href="#" data-view="dashboard" class="nav-view-link"><span class="dot" aria-hidden="true"></span>Início</a>
           <a href="#" data-view="tool" class="nav-view-link"><span class="dot" aria-hidden="true"></span>Upload & Análise</a>
           <a href="#" data-view="reports" class="nav-view-link"><span class="dot" aria-hidden="true"></span>Relatórios</a>
+          <a href="#" data-view="charts" class="nav-view-link"><span class="dot" aria-hidden="true"></span>Gráficos</a>
           <a href="#" data-view="projects" class="nav-view-link"><span class="dot" aria-hidden="true"></span>Projetos</a>
           <a href="#" data-view="settings" class="nav-view-link"><span class="dot" aria-hidden="true"></span>Configurações</a>
         </nav>
@@ -35,6 +36,7 @@
           <ul class="sidebar-list" id="sidebarAnalysesList"><li class="empty">Nenhuma análise</li></ul>
           <button class="sidebar-add-btn" id="btnSaveAnalysis" type="button">💾 Salvar análise atual</button>
         </div>
+        <button class="sidebar-toggle" id="sidebarToggle" type="button" title="Minimizar sidebar">◀</button>
       </aside>
       <div class="main">
         <header class="topbar">
@@ -77,6 +79,11 @@
                 <div class="card-icon">📋</div>
                 <div class="card-title">Relatórios</div>
                 <div class="card-desc">Consulte, reprocesse ou exclua relatórios de análises gerados.</div>
+              </div>
+              <div class="dash-card c-charts" data-goto="charts">
+                <div class="card-icon">📊</div>
+                <div class="card-title">Gráficos</div>
+                <div class="card-desc">Histogramas, scatter plots, radar e gauges dos dados processados.</div>
               </div>
               <div class="dash-card c-ai" data-goto="aiInsightsSection">
                 <div class="card-icon">🤖</div>
@@ -194,6 +201,46 @@
             <div id="reportDetailPage" class="report-detail-page" style="display:none;"></div>
           </div>
 
+          <!-- Gráficos View -->
+          <div class="view" id="viewCharts">
+            <div class="charts-header">
+              <h2>📊 Gráficos Analíticos</h2>
+              <span class="charts-sub">Visualizações estatísticas e de compliance baseadas nos dados processados</span>
+            </div>
+            <div id="chartsEmptyState" class="charts-empty" style="display:none;">
+              <div class="charts-empty-icon">📊</div>
+              <div class="charts-empty-text">Nenhum dado carregado</div>
+              <div class="charts-empty-hint">Vá para <strong>Upload & Análise</strong> e processe um CSV para ver os gráficos.</div>
+            </div>
+            <div id="chartsGrid" class="charts-grid">
+              <div class="chart-card">
+                <div class="chart-card-title">📊 Histograma de Amplitudes</div>
+                <div class="chart-card-desc">Distribuição das intensidades (dBµV) — mostra a concentração dos valores medidos</div>
+                <div id="chartHistogram" class="chart-card-plot"></div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-card-title">🎯 Scatter de Picos</div>
+                <div class="chart-card-desc">Frequência × Amplitude dos picos detectados — tamanho indica proximidade ao limite</div>
+                <div id="chartPeakScatter" class="chart-card-plot"></div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-card-title">📦 Box Plot por Banda</div>
+                <div class="chart-card-desc">Distribuição estatística (min/max/mediana/quartis) por faixa de frequência</div>
+                <div id="chartBoxPlot" class="chart-card-plot"></div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-card-title">🕸 Radar de Comparação</div>
+                <div class="chart-card-desc">Comparação multi-dimensional entre séries: amplitude, picos, energia, margem</div>
+                <div id="chartRadar" class="chart-card-plot"></div>
+              </div>
+              <div class="chart-card chart-card-wide">
+                <div class="chart-card-title">🎯 Gauge de Margem</div>
+                <div class="chart-card-desc">Indicadores visuais da menor margem ao limite por banda de frequência</div>
+                <div id="chartGauges" class="chart-card-gauges"></div>
+              </div>
+            </div>
+          </div>
+
           <div class="tool-panels" id="toolPanels">
 
     <div id="authOverlay" class="auth-overlay">
@@ -277,434 +324,444 @@
       </div>
     </div>
 
-    <div class="container">
-      <div class="panel">
-        <div class="controls">
-          <div id="upload" class="group-title">Upload & Processamento</div>
-          <div class="control-row">
-            <div id="dropzone" class="dropzone">
-              <input id="fileInput" type="file" accept=".csv" multiple />
-              <div class="dropzone-text">
-                <strong>Arraste seus CSVs aqui</strong>
-                <span>ou clique para selecionar (1+ arquivos; ex.: X/Y/Z)</span>
-                <div id="fileList" class="file-list"></div>
-              </div>
+    <div class="tool-layout">
+      <!-- LEFT COLUMN: Chart + Insights -->
+      <div class="tool-main">
+        <!-- Upload Bar -->
+        <div class="upload-bar">
+          <div class="upload-dropzone" id="dropzone">
+            <input id="fileInput" type="file" accept=".csv" multiple />
+            <div class="upload-icon">📂</div>
+            <div class="upload-text">
+              <strong>Arraste CSVs aqui</strong>
+              <span>ou clique para selecionar</span>
             </div>
-            <button id="btnUpload">Processar</button>
-            <button id="btnReport" class="secondary" disabled>Baixar relatório (HTML)</button>
-            <button id="btnReportPdf" class="secondary" disabled>Imprimir PDF</button>
-            <button id="btn3d" class="secondary" disabled>Abrir 3D</button>
-            <button id="btnClear" class="secondary">Limpar</button>
-            <span id="status" class="status loading"></span>
-            <span id="spinner" class="spinner hidden" aria-hidden="true"></span>
+            <div id="fileList" class="file-list"></div>
           </div>
-
-          <details class="filter-group" open>
-            <summary>Arquivos por eixo (opcional) <span class="chev" aria-hidden="true">⌄</span></summary>
-            <div class="filter-body">
-              <div class="control-row">
-                <div class="axis-picker">
-                  <button id="btnPickX" class="secondary" type="button">CSV X</button>
-                  <input id="fileInputX" type="file" accept=".csv" class="hidden-input" />
-                  <span id="axisFileX" class="file-chip axis-file">X: —</span>
-                </div>
-                <div class="axis-picker">
-                  <button id="btnPickY" class="secondary" type="button">CSV Y</button>
-                  <input id="fileInputY" type="file" accept=".csv" class="hidden-input" />
-                  <span id="axisFileY" class="file-chip axis-file">Y: —</span>
-                </div>
-                <div class="axis-picker">
-                  <button id="btnPickZ" class="secondary" type="button">CSV Z</button>
-                  <input id="fileInputZ" type="file" accept=".csv" class="hidden-input" />
-                  <span id="axisFileZ" class="file-chip axis-file">Z: —</span>
-                </div>
-              </div>
+          <div class="upload-actions">
+            <div class="upload-actions-primary">
+              <button id="btnUpload">▶ Processar</button>
+              <button id="btnClear" class="secondary">✕ Limpar</button>
             </div>
-          </details>
-
-          <details class="filter-group" open>
-            <summary>Ajustes rápidos <span class="chev" aria-hidden="true">⌄</span></summary>
-            <div class="filter-body">
-              <div class="control-row">
-                <div class="control">
-                  <label for="presetSelect">Preset</label>
-                  <select id="presetSelect">
-                    <option value="manual">Manual</option>
-                    <option value="lowband">Banda baixa</option>
-                    <option value="highband">Banda alta</option>
-                    <option value="aggressive">Picos agressivos</option>
-                  </select>
-                </div>
-                <div class="control">
-                  <label for="smoothingMethod">Suavização</label>
-                  <select id="smoothingMethod">
-                    <option value="none">Nenhuma</option>
-                    <option value="moving">Média móvel</option>
-                    <option value="savgol">Savitzky-Golay</option>
-                  </select>
-                </div>
-                <div class="control">
-                  <label for="smoothingWindow">Janela</label>
-                  <input id="smoothingWindow" type="number" min="1" value="7" />
-                </div>
-              </div>
-
-              <details class="filter-group">
-                <summary>Avançado <span class="chev" aria-hidden="true">⌄</span></summary>
-                <div class="filter-body">
-                  <div class="control-row">
-                    <div class="control">
-                      <label for="peakMinHeight">Pico min (dBµV)</label>
-                      <input id="peakMinHeight" type="number" step="0.1" placeholder="ex: 10" />
-                    </div>
-                    <div class="control">
-                      <label for="peakMinDistance">Distância</label>
-                      <input id="peakMinDistance" type="number" min="1" placeholder="ex: 5" />
-                    </div>
-                    <div class="control">
-                      <label for="maxPeaks">Máx picos</label>
-                      <input id="maxPeaks" type="number" min="10" value="200" />
-                    </div>
-                    <div class="control">
-                      <label for="freqMin">Freq min</label>
-                      <input id="freqMin" type="number" step="0.1" placeholder="ex: 10" />
-                    </div>
-                    <div class="control">
-                      <label for="freqMax">Freq max</label>
-                      <input id="freqMax" type="number" step="0.1" placeholder="ex: 100" />
-                    </div>
-                    <div class="control">
-                      <label for="maxPoints">Max pontos</label>
-                      <input id="maxPoints" type="number" min="200" max="20000" value="5000" />
-                    </div>
-                  </div>
-                </div>
-              </details>
+            <div class="upload-actions-export">
+              <button id="btnReport" class="secondary" disabled>📄 HTML</button>
+              <button id="btnReportPdf" class="secondary" disabled>📄 PDF</button>
+              <button id="btnExportImage" class="secondary" disabled>🖼 Imagem</button>
+              <button id="btn3d" class="secondary" disabled>🧊 3D</button>
             </div>
-          </details>
-
-          <details class="filter-group">
-            <summary>Limites & normas <span class="chev" aria-hidden="true">⌄</span></summary>
-            <div class="filter-body">
-              <div class="control-row">
-                <div class="control">
-                  <label for="limitSource">Fonte limite</label>
-                  <select id="limitSource">
-                    <option value="none">Nenhum</option>
-                    <option value="file">Arquivo CSV</option>
-                    <option value="preset">Preset</option>
-                    <option value="norm">Norma</option>
-                  </select>
-                </div>
-                <div class="control">
-                  <label for="limitInput">Curva limite</label>
-                  <input id="limitInput" type="file" accept=".csv" />
-                </div>
-                <div class="control">
-                  <label for="limitPreset">Preset limite</label>
-                  <select id="limitPreset">
-                    <option value="none">Nenhum</option>
-                    <option value="cispr_a">CISPR A (exemplo)</option>
-                    <option value="cispr_b">CISPR B (exemplo)</option>
-                    <option value="iec_generic">IEC (exemplo)</option>
-                  </select>
-                </div>
-              </div>
-              <div class="control-row">
-                <div class="control">
-                  <label for="normSelect">Norma</label>
-                  <select id="normSelect"></select>
-                </div>
-                <div class="control">
-                  <label for="normFile">Norma JSON</label>
-                  <input id="normFile" type="file" accept=".json" />
-                </div>
-                <div class="control">
-                  <label for="normClass">Classe</label>
-                  <select id="normClass"></select>
-                </div>
-                <div class="control">
-                  <label for="normBand">Faixa</label>
-                  <select id="normBand"></select>
-                </div>
-              </div>
-              <div class="control-row">
-                <div class="control">
-                  <label for="limitEnabled">Usar limite</label>
-                  <input id="limitEnabled" type="checkbox" />
-                </div>
-                <div class="control">
-                  <label for="limitMargin">Margem (dB)</label>
-                  <input id="limitMargin" type="number" step="0.1" value="0" />
-                </div>
-              </div>
-            </div>
-          </details>
-
-          <details class="filter-group">
-            <summary>Bandas & 3D <span class="chev" aria-hidden="true">⌄</span></summary>
-            <div class="filter-body">
-              <div class="control-row">
-                <div class="control">
-                  <label for="bandPreset">Preset banda</label>
-                  <select id="bandPreset">
-                    <option value="none">Nenhum</option>
-                    <option value="basic">Baixa/Média/Alta</option>
-                    <option value="wide">0-100 / 100-1000</option>
-                  </select>
-                </div>
-                <div class="control">
-                  <label for="bandMin">Banda min</label>
-                  <input id="bandMin" type="number" step="0.1" placeholder="ex: 0.15" />
-                </div>
-                <div class="control">
-                  <label for="bandMax">Banda max</label>
-                  <input id="bandMax" type="number" step="0.1" placeholder="ex: 30" />
-                </div>
-                <button id="btnAddBand" class="secondary">Adicionar banda</button>
-              </div>
-            </div>
-          </details>
-
-          <details class="filter-group">
-            <summary>Exportação <span class="chev" aria-hidden="true">⌄</span></summary>
-            <div class="filter-body">
-              <div class="control-row">
-                <div class="control">
-                  <label for="exportWidth">Export Largura</label>
-                  <input id="exportWidth" type="number" min="600" max="6000" value="1600" />
-                </div>
-                <div class="control">
-                  <label for="exportHeight">Export Altura</label>
-                  <input id="exportHeight" type="number" min="400" max="4000" value="900" />
-                </div>
-                <div class="control">
-                  <label for="exportTheme">Tema export</label>
-                  <select id="exportTheme">
-                    <option value="dark">Escuro</option>
-                    <option value="light">Claro</option>
-                  </select>
-                </div>
-                <button id="btnExportImage" class="secondary">Exportar imagem</button>
-              </div>
-            </div>
-          </details>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div id="insights" class="group-title">Insights</div>
-        <div id="stats" class="stats"></div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">
-          <div class="title">Insights Avançados</div>
-        </div>
-        <div class="insight-grid">
-          <details class="filter-group" open>
-            <summary>Resumo <span class="chev" aria-hidden="true">⌄</span></summary>
-            <div class="filter-body">
-              <div id="insightsSummaryCards" class="insight-kpis"></div>
-              <div id="insightsFingerprint" class="insight-list"></div>
-            </div>
-          </details>
-
-          <details class="filter-group" open>
-            <summary>Pontos de atenção <span class="chev" aria-hidden="true">⌄</span></summary>
-            <div class="filter-body">
-              <div id="criticalPeaks"></div>
-              <div class="control-row">
-                <button id="btnAddBookmark" class="secondary" type="button">Adicionar marcador</button>
-                <button id="btnClearBookmarks" class="secondary" type="button">Limpar marcadores</button>
-              </div>
-              <div id="bookmarkList" class="insight-list"></div>
-            </div>
-          </details>
-
-          <details class="filter-group">
-            <summary>Qualidade do CSV <span class="chev" aria-hidden="true">⌄</span></summary>
-            <div class="filter-body">
-              <div id="qualityIssues" class="insight-list"></div>
-            </div>
-          </details>
-
-          <details class="filter-group">
-            <summary>Comparação rápida <span class="chev" aria-hidden="true">⌄</span></summary>
-            <div class="filter-body">
-              <div class="pattern-grid">
-                <div class="panel" style="padding:12px;">
-                  <div class="group-title">Resumo por arquivo</div>
-                  <div id="trendPlot" class="plot-mini"></div>
-                </div>
-                <div class="panel" style="padding:12px;">
-                  <div class="group-title">Δ vs baseline (mapa)</div>
-                  <div id="deltaHeatmapPlot" class="plot-mini"></div>
-                </div>
-              </div>
-            </div>
-          </details>
-
-          <details class="filter-group">
-            <summary>Sugestões <span class="chev" aria-hidden="true">⌄</span></summary>
-            <div class="filter-body">
-              <div id="insightSuggestions" class="insight-list"></div>
-            </div>
-          </details>
-        </div>
-      </div>
-
-      <!-- AI Insights Card -->
-      <div class="panel" id="aiInsightsSection">
-        <div class="panel-head">
-          <div class="title">🤖 AI Insights</div>
-        </div>
-        <div class="ai-panel" id="aiInsightsCard">
-          <div class="ai-header">
-            <span class="ai-badge ai-inactive" id="aiBadge">Análise sem IA</span>
-            <span id="aiEmissionBadge"></span>
           </div>
-          <div class="ai-body" id="aiInsightsBody">
-            <div class="ai-hint">Processe um CSV para ver insights. Configure <code>AI_PROVIDER</code> e <code>AI_API_KEY</code> no servidor para diagnósticos automáticos por IA.</div>
+          <span id="status" class="status loading"></span>
+          <span id="spinner" class="spinner hidden" aria-hidden="true"></span>
+        </div>
+
+        <!-- Chart Panel -->
+        <div class="panel chart-panel">
+          <div class="panel-head">
+            <div class="title">Gráficos</div>
+            <div class="chart-controls" aria-label="Opções do gráfico">
+              <div class="control compact">
+                <label for="plot2dMode">2D</label>
+                <select id="plot2dMode">
+                  <option value="lines">Curvas</option>
+                  <option value="area">Área</option>
+                  <option value="points">Pontos</option>
+                  <option value="lines_points">Curvas + pontos</option>
+                  <option value="heatmap">Mapa (heatmap)</option>
+                  <option value="envelope_max">Envelope (máx)</option>
+                  <option value="envelope_mean">Envelope (média)</option>
+                  <option value="envelope_min">Envelope (mín)</option>
+                  <option value="delta">Δ vs baseline</option>
+                  <option value="margin">Margem do limite</option>
+                </select>
+              </div>
+              <div class="control compact">
+                <label for="showCommonBands">Bandas</label>
+                <input id="showCommonBands" type="checkbox" checked />
+              </div>
+              <div class="control compact">
+                <label for="showHarmonics2d">Harmônicos</label>
+                <input id="showHarmonics2d" type="checkbox" />
+              </div>
+              <div class="control compact">
+                <label for="showPeaks">Picos</label>
+                <input id="showPeaks" type="checkbox" checked />
+              </div>
+              <div class="control compact">
+                <label for="showPeakLabels">Etiquetas</label>
+                <input id="showPeakLabels" type="checkbox" />
+              </div>
+              <div class="control compact">
+                <label for="peakLabelCount">Qtd</label>
+                <input id="peakLabelCount" type="number" min="1" max="30" value="5" />
+              </div>
+              <div class="control compact">
+                <label for="heatmapBins">Bins</label>
+                <input id="heatmapBins" type="number" min="80" max="1200" value="320" />
+              </div>
+              <div class="control compact">
+                <label for="baselineSelect">Baseline</label>
+                <select id="baselineSelect"></select>
+              </div>
+              <button id="btn3dChart" class="secondary" type="button" disabled>Abrir 3D</button>
+            </div>
           </div>
+          <div id="plot2d" class="plot"></div>
         </div>
-      </div>
 
-      <!-- Revision Comparison -->
-      <div class="panel" id="revisionComparisonSection" style="display:none;">
-        <div class="panel-head">
-          <div class="title">📊 Comparação entre revisões</div>
-        </div>
-        <div id="revisionComparisonBody" class="revision-panel"></div>
-      </div>
-
-      <div class="panel">
-        <div id="patternsSection" class="section-title">Padrões detectados</div>
-        <div id="patterns" class="pattern-grid"></div>
-      </div>
-
-      <div class="panel">
-        <div id="bands" class="section-title">Bandas</div>
-        <div id="bandList" class="pill-list"></div>
-        <div id="bandStats"></div>
-      </div>
-
-      <div class="panel">
-        <div id="comparisonSection" class="section-title">Comparação entre medições</div>
-        <div id="comparison"></div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">
-          <div class="title">Gráficos</div>
-          <div class="chart-controls" aria-label="Opções do gráfico">
-            <div class="control compact">
-              <label for="plot2dMode">2D</label>
-              <select id="plot2dMode">
-                <option value="lines">Curvas</option>
-                <option value="area">Área</option>
-                <option value="points">Pontos</option>
-                <option value="lines_points">Curvas + pontos</option>
-                <option value="heatmap">Mapa (heatmap)</option>
-                <option value="envelope_max">Envelope (máx)</option>
-                <option value="envelope_mean">Envelope (média)</option>
-                <option value="envelope_min">Envelope (mín)</option>
-                <option value="delta">Δ vs baseline</option>
-                <option value="margin">Margem do limite</option>
-              </select>
+        <!-- 3D Panel -->
+        <div class="panel" id="panel3d" style="display:none;">
+          <div class="panel-head">
+            <div class="title">3D</div>
+            <div class="chart-controls" aria-label="Opções do gráfico 3D">
+              <div class="control compact">
+                <label for="mode3d">Modo</label>
+                <select id="mode3d">
+                  <option value="lines">Linhas</option>
+                  <option value="lines_points">Linhas + pontos</option>
+                  <option value="points">Pontos</option>
+                  <option value="points_intensity">Pontos (intensidade)</option>
+                  <option value="lines_points_intensity">Linhas + pontos (intensidade)</option>
+                  <option value="surface">Superfície</option>
+                  <option value="surface_lines">Superfície + linhas</option>
+                </select>
+              </div>
+              <div class="control compact">
+                <label for="bins3d">Bins</label>
+                <input id="bins3d" type="number" min="50" max="800" value="200" />
+              </div>
+              <div class="control compact">
+                <label for="colorscale3d">Cores</label>
+                <select id="colorscale3d">
+                  <option value="Viridis">Viridis</option>
+                  <option value="Turbo" selected>Turbo</option>
+                  <option value="Cividis">Cividis</option>
+                  <option value="IceFire">IceFire</option>
+                </select>
+              </div>
+              <div class="control compact">
+                <label for="showContours3d">Contornos</label>
+                <input id="showContours3d" type="checkbox" />
+              </div>
+              <div class="control compact">
+                <label for="showLimit3d">Limite</label>
+                <input id="showLimit3d" type="checkbox" />
+              </div>
+              <div class="control compact">
+                <label for="camera3d">Câmera</label>
+                <select id="camera3d">
+                  <option value="iso" selected>Isométrica</option>
+                  <option value="top">Topo</option>
+                  <option value="front">Frente</option>
+                  <option value="side">Lado</option>
+                </select>
+              </div>
             </div>
-            <div class="control compact">
-              <label for="showCommonBands">Bandas</label>
-              <input id="showCommonBands" type="checkbox" checked />
-            </div>
-            <div class="control compact">
-              <label for="showHarmonics2d">Harmônicos</label>
-              <input id="showHarmonics2d" type="checkbox" />
-            </div>
-            <div class="control compact">
-              <label for="showPeaks">Picos</label>
-              <input id="showPeaks" type="checkbox" checked />
-            </div>
-            <div class="control compact">
-              <label for="showPeakLabels">Etiquetas</label>
-              <input id="showPeakLabels" type="checkbox" />
-            </div>
-            <div class="control compact">
-              <label for="peakLabelCount">Qtd</label>
-              <input id="peakLabelCount" type="number" min="1" max="30" value="5" />
-            </div>
-            <div class="control compact">
-              <label for="heatmapBins">Bins</label>
-              <input id="heatmapBins" type="number" min="80" max="1200" value="320" />
-            </div>
-            <div class="control compact">
-              <label for="baselineSelect">Baseline</label>
-              <select id="baselineSelect"></select>
-            </div>
-            <button id="btn3dChart" class="secondary" type="button" disabled>Abrir 3D</button>
           </div>
+          <div id="plot3d" class="plot-3d"></div>
         </div>
-        <div id="plot2d" class="plot"></div>
-      </div>
 
-      <div class="panel" id="panel3d" style="display:none;">
-        <div class="panel-head">
-          <div class="title">3D</div>
-          <div class="chart-controls" aria-label="Opções do gráfico 3D">
-            <div class="control compact">
-              <label for="mode3d">Modo</label>
-              <select id="mode3d">
-                <option value="lines">Linhas</option>
-                <option value="lines_points">Linhas + pontos</option>
-                <option value="points">Pontos</option>
-                <option value="points_intensity">Pontos (intensidade)</option>
-                <option value="lines_points_intensity">Linhas + pontos (intensidade)</option>
-                <option value="surface">Superfície</option>
-                <option value="surface_lines">Superfície + linhas</option>
-              </select>
+        <!-- Insights KPI Cards -->
+        <div class="panel">
+          <div id="insights" class="group-title">Insights</div>
+          <div id="stats" class="stats"></div>
+        </div>
+
+        <!-- AI Insights Card -->
+        <div class="panel" id="aiInsightsSection">
+          <div class="panel-head">
+            <div class="title">🤖 AI Insights</div>
+          </div>
+          <div class="ai-panel" id="aiInsightsCard">
+            <div class="ai-header">
+              <span class="ai-badge ai-inactive" id="aiBadge">Análise sem IA</span>
+              <span id="aiEmissionBadge"></span>
             </div>
-            <div class="control compact">
-              <label for="bins3d">Bins</label>
-              <input id="bins3d" type="number" min="50" max="800" value="200" />
-            </div>
-            <div class="control compact">
-              <label for="colorscale3d">Cores</label>
-              <select id="colorscale3d">
-                <option value="Viridis">Viridis</option>
-                <option value="Turbo" selected>Turbo</option>
-                <option value="Cividis">Cividis</option>
-                <option value="IceFire">IceFire</option>
-              </select>
-            </div>
-            <div class="control compact">
-              <label for="showContours3d">Contornos</label>
-              <input id="showContours3d" type="checkbox" />
-            </div>
-            <div class="control compact">
-              <label for="showLimit3d">Limite</label>
-              <input id="showLimit3d" type="checkbox" />
-            </div>
-            <div class="control compact">
-              <label for="camera3d">Câmera</label>
-              <select id="camera3d">
-                <option value="iso" selected>Isométrica</option>
-                <option value="top">Topo</option>
-                <option value="front">Frente</option>
-                <option value="side">Lado</option>
-              </select>
+            <div class="ai-body" id="aiInsightsBody">
+              <div class="ai-hint">Processe um CSV para ver insights. Configure <code>AI_PROVIDER</code> e <code>AI_API_KEY</code> no servidor para diagnósticos automáticos por IA.</div>
             </div>
           </div>
         </div>
-        <div id="plot3d" class="plot-3d"></div>
+
+        <!-- Revision Comparison -->
+        <div class="panel" id="revisionComparisonSection" style="display:none;">
+          <div class="panel-head">
+            <div class="title">📊 Comparação entre revisões</div>
+          </div>
+          <div id="revisionComparisonBody" class="revision-panel"></div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: Controls Sidebar -->
+      <div class="tool-sidebar">
+        <!-- Eixos -->
+        <details class="filter-group" open>
+          <summary>Arquivos por eixo <span class="chev" aria-hidden="true">⌄</span></summary>
+          <div class="filter-body">
+            <div class="control-row">
+              <div class="axis-picker">
+                <button id="btnPickX" class="secondary" type="button">CSV X</button>
+                <input id="fileInputX" type="file" accept=".csv" class="hidden-input" />
+                <span id="axisFileX" class="file-chip axis-file">X: —</span>
+              </div>
+              <div class="axis-picker">
+                <button id="btnPickY" class="secondary" type="button">CSV Y</button>
+                <input id="fileInputY" type="file" accept=".csv" class="hidden-input" />
+                <span id="axisFileY" class="file-chip axis-file">Y: —</span>
+              </div>
+              <div class="axis-picker">
+                <button id="btnPickZ" class="secondary" type="button">CSV Z</button>
+                <input id="fileInputZ" type="file" accept=".csv" class="hidden-input" />
+                <span id="axisFileZ" class="file-chip axis-file">Z: —</span>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Processamento (Ajustes + Avançado merged) -->
+        <details class="filter-group" open>
+          <summary>Processamento <span class="chev" aria-hidden="true">⌄</span></summary>
+          <div class="filter-body">
+            <div class="control-row">
+              <div class="control">
+                <label for="presetSelect">Preset</label>
+                <select id="presetSelect">
+                  <option value="manual">Manual</option>
+                  <option value="lowband">Banda baixa</option>
+                  <option value="highband">Banda alta</option>
+                  <option value="aggressive">Picos agressivos</option>
+                </select>
+              </div>
+              <div class="control">
+                <label for="smoothingMethod">Suavização</label>
+                <select id="smoothingMethod">
+                  <option value="none">Nenhuma</option>
+                  <option value="moving">Média móvel</option>
+                  <option value="savgol">Savitzky-Golay</option>
+                </select>
+              </div>
+              <div class="control">
+                <label for="smoothingWindow">Janela</label>
+                <input id="smoothingWindow" type="number" min="1" value="7" />
+              </div>
+            </div>
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section-label">Avançado</div>
+            <div class="control-row">
+              <div class="control">
+                <label for="peakMinHeight">Pico min</label>
+                <input id="peakMinHeight" type="number" step="0.1" placeholder="dBµV" />
+              </div>
+              <div class="control">
+                <label for="peakMinDistance">Distância</label>
+                <input id="peakMinDistance" type="number" min="1" placeholder="pts" />
+              </div>
+              <div class="control">
+                <label for="maxPeaks">Máx picos</label>
+                <input id="maxPeaks" type="number" min="10" value="200" />
+              </div>
+            </div>
+            <div class="control-row">
+              <div class="control">
+                <label for="freqMin">Freq min</label>
+                <input id="freqMin" type="number" step="0.1" placeholder="MHz" />
+              </div>
+              <div class="control">
+                <label for="freqMax">Freq max</label>
+                <input id="freqMax" type="number" step="0.1" placeholder="MHz" />
+              </div>
+              <div class="control">
+                <label for="maxPoints">Max pontos</label>
+                <input id="maxPoints" type="number" min="200" max="20000" value="5000" />
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Limites & Normas -->
+        <details class="filter-group">
+          <summary>Limites & normas <span class="chev" aria-hidden="true">⌄</span></summary>
+          <div class="filter-body">
+            <div class="control-row">
+              <div class="control">
+                <label for="limitSource">Fonte limite</label>
+                <select id="limitSource">
+                  <option value="none">Nenhum</option>
+                  <option value="file">Arquivo CSV</option>
+                  <option value="preset">Preset</option>
+                  <option value="norm">Norma</option>
+                </select>
+              </div>
+              <div class="control">
+                <label for="limitInput">Curva limite</label>
+                <input id="limitInput" type="file" accept=".csv" />
+              </div>
+              <div class="control">
+                <label for="limitPreset">Preset limite</label>
+                <select id="limitPreset">
+                  <option value="none">Nenhum</option>
+                  <option value="cispr_a">CISPR A (exemplo)</option>
+                  <option value="cispr_b">CISPR B (exemplo)</option>
+                  <option value="iec_generic">IEC (exemplo)</option>
+                </select>
+              </div>
+            </div>
+            <div class="control-row">
+              <div class="control">
+                <label for="normSelect">Norma</label>
+                <select id="normSelect"></select>
+              </div>
+              <div class="control">
+                <label for="normFile">Norma JSON</label>
+                <input id="normFile" type="file" accept=".json" />
+              </div>
+              <div class="control">
+                <label for="normClass">Classe</label>
+                <select id="normClass"></select>
+              </div>
+              <div class="control">
+                <label for="normBand">Faixa</label>
+                <select id="normBand"></select>
+              </div>
+            </div>
+            <div class="control-row">
+              <div class="control">
+                <label for="limitEnabled">Usar limite</label>
+                <input id="limitEnabled" type="checkbox" />
+              </div>
+              <div class="control">
+                <label for="limitMargin">Margem (dB)</label>
+                <input id="limitMargin" type="number" step="0.1" value="0" />
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Bandas & Exportação (merged) -->
+        <details class="filter-group">
+          <summary>Bandas & Exportação <span class="chev" aria-hidden="true">⌄</span></summary>
+          <div class="filter-body">
+            <div class="sidebar-section-label">Bandas</div>
+            <div class="control-row">
+              <div class="control">
+                <label for="bandPreset">Preset banda</label>
+                <select id="bandPreset">
+                  <option value="none">Nenhum</option>
+                  <option value="basic">Baixa/Média/Alta</option>
+                  <option value="wide">0-100 / 100-1000</option>
+                </select>
+              </div>
+              <div class="control">
+                <label for="bandMin">Banda min</label>
+                <input id="bandMin" type="number" step="0.1" placeholder="MHz" />
+              </div>
+              <div class="control">
+                <label for="bandMax">Banda max</label>
+                <input id="bandMax" type="number" step="0.1" placeholder="MHz" />
+              </div>
+              <button id="btnAddBand" class="secondary">+ Banda</button>
+            </div>
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section-label">Exportação</div>
+            <div class="control-row">
+              <div class="control">
+                <label for="exportWidth">Largura</label>
+                <input id="exportWidth" type="number" min="600" max="6000" value="1600" />
+              </div>
+              <div class="control">
+                <label for="exportHeight">Altura</label>
+                <input id="exportHeight" type="number" min="400" max="4000" value="900" />
+              </div>
+              <div class="control">
+                <label for="exportTheme">Tema</label>
+                <select id="exportTheme">
+                  <option value="dark">Escuro</option>
+                  <option value="light">Claro</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Insights Avançados -->
+        <details class="filter-group" open>
+          <summary>Insights Avançados <span class="chev" aria-hidden="true">⌄</span></summary>
+          <div class="filter-body">
+            <div id="insightsSummaryCards" class="insight-kpis"></div>
+            <div id="insightsFingerprint" class="insight-list"></div>
+          </div>
+        </details>
+
+        <details class="filter-group" open>
+          <summary>Pontos de atenção <span class="chev" aria-hidden="true">⌄</span></summary>
+          <div class="filter-body">
+            <div id="criticalPeaks"></div>
+            <div class="control-row">
+              <button id="btnAddBookmark" class="secondary" type="button">Adicionar marcador</button>
+              <button id="btnClearBookmarks" class="secondary" type="button">Limpar marcadores</button>
+            </div>
+            <div id="bookmarkList" class="insight-list"></div>
+          </div>
+        </details>
+
+        <details class="filter-group">
+          <summary>Qualidade do CSV <span class="chev" aria-hidden="true">⌄</span></summary>
+          <div class="filter-body">
+            <div id="qualityIssues" class="insight-list"></div>
+          </div>
+        </details>
+
+        <details class="filter-group">
+          <summary>Comparação rápida <span class="chev" aria-hidden="true">⌄</span></summary>
+          <div class="filter-body">
+            <div class="pattern-grid">
+              <div class="panel" style="padding:12px;">
+                <div class="group-title">Resumo por arquivo</div>
+                <div id="trendPlot" class="plot-mini"></div>
+              </div>
+              <div class="panel" style="padding:12px;">
+                <div class="group-title">Δ vs baseline (mapa)</div>
+                <div id="deltaHeatmapPlot" class="plot-mini"></div>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details class="filter-group">
+          <summary>Sugestões <span class="chev" aria-hidden="true">⌄</span></summary>
+          <div class="filter-body">
+            <div id="insightSuggestions" class="insight-list"></div>
+          </div>
+        </details>
+
+        <!-- Patterns, Bands, Comparison panels -->
+        <div class="panel" style="margin-top:10px;">
+          <div id="patternsSection" class="section-title">Padrões detectados</div>
+          <div id="patterns" class="pattern-grid"></div>
+        </div>
+        <div class="panel">
+          <div id="bands" class="section-title">Bandas</div>
+          <div id="bandList" class="pill-list"></div>
+          <div id="bandStats"></div>
+        </div>
+        <div class="panel">
+          <div id="comparisonSection" class="section-title">Comparação entre medições</div>
+          <div id="comparison"></div>
+        </div>
       </div>
     </div>
-        </div>
-      </div>
-    </div>
-          </div><!-- close tool-panels -->
 
     <script>
       const API_URL = `${window.location.origin}/api`;
+      // Sidebar toggle
+      (function() {
+        const shell = document.querySelector('.app-shell');
+        const btn = document.getElementById('sidebarToggle');
+        if (localStorage.getItem('sidebar-collapsed') === '1') shell.classList.add('sidebar-collapsed');
+        btn.addEventListener('click', () => {
+          shell.classList.toggle('sidebar-collapsed');
+          localStorage.setItem('sidebar-collapsed', shell.classList.contains('sidebar-collapsed') ? '1' : '0');
+        });
+      })();
       const fileInput = document.getElementById("fileInput");
       const fileInputX = document.getElementById("fileInputX");
       const fileInputY = document.getElementById("fileInputY");
@@ -2704,17 +2761,21 @@
                 x1: m.frequency,
                 y0: 0,
                 y1: 1,
-                line: { color: "rgba(140,123,255,0.28)", width: 1, dash: "dot" }
+                line: { color: "rgba(140,123,255,0.35)", width: 1.5, dash: "dot" }
               });
               annotations.push({
                 xref: "x",
                 yref: "paper",
                 x: m.frequency,
-                y: 1,
+                y: 1.02,
                 yanchor: "bottom",
                 text: `H${m.n}`,
                 showarrow: false,
-                font: { size: 10, color: "rgba(140,123,255,0.9)" }
+                font: { size: 11, color: "#b8adff", family: "Inter, sans-serif" },
+                bgcolor: "rgba(140,123,255,0.12)",
+                borderpad: 3,
+                bordercolor: "rgba(140,123,255,0.25)",
+                borderwidth: 1
               });
             });
         }
@@ -3010,7 +3071,7 @@
           font: { color: "#e7edf3" },
           xaxis: { title: "Frequência", gridcolor: "#1f2a36", showspikes: true, spikemode: "across", spikecolor: "rgba(87,214,255,0.22)" },
           yaxis: { title: yTitle, gridcolor: "#1f2a36", zeroline: mode === "delta" || mode === "margin", zerolinecolor: "rgba(150,163,173,0.35)" },
-          margin: { t: 10, l: 50, r: 20, b: 45 },
+          margin: { t: 35, l: 50, r: 20, b: 45 },
           legend: { orientation: "h" }
         };
 
@@ -4199,6 +4260,7 @@
       const viewProjectsEl = document.getElementById('viewProjects');
       const viewSettingsEl = document.getElementById('viewSettings');
       const viewReportsEl = document.getElementById('viewReports');
+      const viewChartsEl = document.getElementById('viewCharts');
       let currentView = 'dashboard';
 
       function switchView(view) {
@@ -4209,6 +4271,7 @@
         viewProjectsEl.classList.remove('active');
         viewSettingsEl.classList.remove('active');
         viewReportsEl.classList.remove('active');
+        viewChartsEl.classList.remove('active');
         // Show target
         switch(view) {
           case 'dashboard':
@@ -4230,6 +4293,10 @@
           case 'reports':
             viewReportsEl.classList.add('active');
             renderReportsView();
+            break;
+          case 'charts':
+            viewChartsEl.classList.add('active');
+            renderChartsView();
             break;
         }
         // Update active nav link
@@ -4256,6 +4323,7 @@
           if (target === 'settings') { switchView('settings'); return; }
           if (target === 'projects') { switchView('projects'); return; }
           if (target === 'reports') { switchView('reports'); return; }
+          if (target === 'charts') { switchView('charts'); return; }
           if (target === 'demo') {
             switchView('tool');
             fetch(`${API_URL}/demo`).then(r => r.json()).then(data => {
@@ -4568,6 +4636,231 @@
       }
 
       refreshNormSelectors();
+
+      // ─── Charts View ───
+      const CHART_LAYOUT_BASE = {
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(21,27,35,0.5)",
+        font: { color: "#e7edf3", family: "Inter, system-ui, sans-serif", size: 12 },
+        margin: { t: 30, l: 50, r: 20, b: 50 },
+        colorway: ["#57d6ff", "#8c7bff", "#00d4a4", "#ff6b6b", "#ffd93d", "#ff9f43"]
+      };
+
+      function renderChartsView() {
+        const emptyEl = document.getElementById("chartsEmptyState");
+        const gridEl = document.getElementById("chartsGrid");
+        if (!lastSeries || lastSeries.length === 0) {
+          emptyEl.style.display = "block";
+          gridEl.style.display = "none";
+          return;
+        }
+        emptyEl.style.display = "none";
+        gridEl.style.display = "";
+
+        renderChartHistogram();
+        renderChartPeakScatter();
+        renderChartBoxPlot();
+        renderChartRadar();
+        renderChartGauges();
+      }
+
+      // 1. Histogram of amplitudes
+      function renderChartHistogram() {
+        const traces = lastSeries.map((s, i) => ({
+          x: (s.intensity || []).filter(Number.isFinite),
+          type: "histogram",
+          name: s.filename || `Série ${i + 1}`,
+          opacity: 0.7,
+          nbinsx: 50,
+          marker: { line: { width: 0.5, color: "#151b23" } }
+        }));
+        const layout = {
+          ...CHART_LAYOUT_BASE,
+          barmode: "overlay",
+          xaxis: { title: "Intensidade (dBµV)", gridcolor: "#1f2a36" },
+          yaxis: { title: "Contagem", gridcolor: "#1f2a36" },
+          legend: { orientation: "h", y: -0.18 }
+        };
+        Plotly.newPlot("chartHistogram", traces, layout, { responsive: true });
+      }
+
+      // 2. Peak Scatter
+      function renderChartPeakScatter() {
+        const traces = lastSeries.map((s, i) => {
+          const peaks = s.peaks || [];
+          return {
+            x: peaks.map(p => p.frequency ?? p[0]),
+            y: peaks.map(p => p.intensity ?? p[1]),
+            mode: "markers",
+            type: "scatter",
+            name: s.filename || `Série ${i + 1}`,
+            marker: {
+              size: peaks.map(p => Math.max(6, Math.min(20, (p.intensity ?? p[1] ?? 10) / 3))),
+              opacity: 0.75,
+              line: { width: 1, color: "rgba(255,255,255,0.2)" }
+            },
+            hovertemplate: "Freq: %{x:.2f}<br>Amp: %{y:.2f} dBµV<extra></extra>"
+          };
+        });
+        const layout = {
+          ...CHART_LAYOUT_BASE,
+          xaxis: { title: "Frequência", gridcolor: "#1f2a36", type: "log" },
+          yaxis: { title: "Amplitude (dBµV)", gridcolor: "#1f2a36" },
+          legend: { orientation: "h", y: -0.18 }
+        };
+        Plotly.newPlot("chartPeakScatter", traces, layout, { responsive: true });
+      }
+
+      // 3. Box Plot by frequency band
+      function renderChartBoxPlot() {
+        const bandDefs = [
+          { label: "0–30 MHz", min: 0, max: 30 },
+          { label: "30–230 MHz", min: 30, max: 230 },
+          { label: "230–1000 MHz", min: 230, max: 1000 },
+          { label: "1–3 GHz", min: 1000, max: 3000 },
+          { label: "3+ GHz", min: 3000, max: Infinity }
+        ];
+        const traces = [];
+        lastSeries.forEach((s, si) => {
+          const freqs = s.frequency || [];
+          const ints = s.intensity || [];
+          bandDefs.forEach(bd => {
+            const vals = [];
+            for (let i = 0; i < freqs.length; i++) {
+              if (freqs[i] >= bd.min && freqs[i] < bd.max && Number.isFinite(ints[i])) vals.push(ints[i]);
+            }
+            if (vals.length > 5) {
+              traces.push({
+                y: vals,
+                type: "box",
+                name: bd.label,
+                legendgroup: bd.label,
+                showlegend: si === 0,
+                boxpoints: false,
+                marker: { opacity: 0.6 },
+                line: { width: 1.5 }
+              });
+            }
+          });
+        });
+        if (traces.length === 0) {
+          Plotly.newPlot("chartBoxPlot", [], {
+            ...CHART_LAYOUT_BASE,
+            annotations: [{ text: "Sem dados suficientes para box plot", xref: "paper", yref: "paper", x: 0.5, y: 0.5, showarrow: false, font: { size: 14, color: "#96a3ad" } }]
+          }, { responsive: true });
+          return;
+        }
+        const layout = {
+          ...CHART_LAYOUT_BASE,
+          yaxis: { title: "Intensidade (dBµV)", gridcolor: "#1f2a36" },
+          legend: { orientation: "h", y: -0.18 },
+          boxmode: "group"
+        };
+        Plotly.newPlot("chartBoxPlot", traces, layout, { responsive: true });
+      }
+
+      // 4. Radar Chart
+      function renderChartRadar() {
+        const metrics = ["Amp Máx", "Amp Média", "Nº Picos", "Desvio Padrão", "Energia"];
+        const rawTraces = lastSeries.map((s, i) => {
+          const ints = (s.intensity || []).filter(Number.isFinite);
+          const peaks = s.peaks || [];
+          const max = ints.length ? Math.max(...ints) : 0;
+          const mean = ints.length ? ints.reduce((a, b) => a + b, 0) / ints.length : 0;
+          const nPeaks = peaks.length;
+          const std = ints.length > 1
+            ? Math.sqrt(ints.reduce((a, v) => a + (v - mean) ** 2, 0) / ints.length)
+            : 0;
+          const energy = ints.reduce((a, v) => a + v * v, 0);
+          return { raw: [max, mean, nPeaks, std, energy], name: s.filename || `Série ${i + 1}` };
+        });
+        const globalMax = metrics.map((_, mi) => Math.max(1, ...rawTraces.map(t => t.raw[mi])));
+        const plotlyTraces = rawTraces.map(t => ({
+          type: "scatterpolar",
+          r: [...t.raw.map((v, mi) => (v / globalMax[mi]) * 100), (t.raw[0] / globalMax[0]) * 100],
+          theta: [...metrics, metrics[0]],
+          fill: "toself",
+          name: t.name,
+          opacity: 0.65,
+          line: { width: 2 }
+        }));
+        const layout = {
+          ...CHART_LAYOUT_BASE,
+          polar: {
+            bgcolor: "rgba(21,27,35,0.3)",
+            radialaxis: { visible: true, range: [0, 100], gridcolor: "#1f2a36", linecolor: "#1f2a36", tickfont: { size: 9 } },
+            angularaxis: { gridcolor: "#1f2a36", linecolor: "#1f2a36" }
+          },
+          legend: { orientation: "h", y: -0.12 },
+          margin: { t: 40, l: 60, r: 60, b: 40 }
+        };
+        Plotly.newPlot("chartRadar", plotlyTraces, layout, { responsive: true });
+      }
+
+      // 5. Gauge indicators
+      function renderChartGauges() {
+        const container = document.getElementById("chartGauges");
+        container.innerHTML = "";
+        const bandDefs = [
+          { label: "0–30 MHz", min: 0, max: 30, color: "#57d6ff" },
+          { label: "30–230 MHz", min: 30, max: 230, color: "#8c7bff" },
+          { label: "230–1 GHz", min: 230, max: 1000, color: "#00d4a4" },
+          { label: "1–3 GHz", min: 1000, max: 3000, color: "#ffd93d" }
+        ];
+        const hasData = lastSeries.some(s => s.frequency && s.frequency.length > 0);
+        if (!hasData) {
+          container.innerHTML = '<div style="text-align:center;padding:40px;color:#96a3ad;">Sem dados para gauges</div>';
+          return;
+        }
+        bandDefs.forEach(bd => {
+          const allVals = [];
+          lastSeries.forEach(s => {
+            const freqs = s.frequency || [];
+            const ints = s.intensity || [];
+            for (let i = 0; i < freqs.length; i++) {
+              if (freqs[i] >= bd.min && freqs[i] < bd.max && Number.isFinite(ints[i])) allVals.push(ints[i]);
+            }
+          });
+          if (allVals.length < 2) return;
+          const maxVal = Math.max(...allVals);
+          const meanVal = allVals.reduce((a, b) => a + b, 0) / allVals.length;
+          const gaugeDiv = document.createElement("div");
+          gaugeDiv.className = "gauge-item";
+          container.appendChild(gaugeDiv);
+
+          const trace = {
+            type: "indicator",
+            mode: "gauge+number+delta",
+            value: maxVal,
+            delta: { reference: meanVal, increasing: { color: "#ff6b6b" }, decreasing: { color: "#00d4a4" }, suffix: " dBµV" },
+            title: { text: bd.label, font: { size: 13, color: "#e7edf3" } },
+            number: { suffix: " dBµV", font: { size: 18, color: "#e7edf3" } },
+            gauge: {
+              axis: { range: [0, Math.ceil(maxVal * 1.2)], tickcolor: "#96a3ad", dtick: Math.ceil(maxVal / 4) },
+              bar: { color: bd.color, thickness: 0.6 },
+              bgcolor: "rgba(21,27,35,0.4)",
+              borderwidth: 1,
+              bordercolor: "#1f2a36",
+              steps: [
+                { range: [0, meanVal * 0.7], color: "rgba(0,212,164,0.1)" },
+                { range: [meanVal * 0.7, meanVal], color: "rgba(255,217,61,0.1)" },
+                { range: [meanVal, Math.ceil(maxVal * 1.2)], color: "rgba(255,107,107,0.1)" }
+              ],
+              threshold: {
+                line: { color: "#ff6b6b", width: 2 },
+                thickness: 0.8,
+                value: meanVal
+              }
+            }
+          };
+          Plotly.newPlot(gaugeDiv, [trace], {
+            paper_bgcolor: "rgba(0,0,0,0)",
+            font: { color: "#e7edf3" },
+            margin: { t: 40, l: 20, r: 20, b: 10 },
+            height: 200
+          }, { responsive: true, displayModeBar: false });
+        });
+      }
       updateLimitSourceUI();
       renderBandList();
       loadBookmarks();
