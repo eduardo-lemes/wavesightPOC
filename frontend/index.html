@@ -330,11 +330,11 @@
         <!-- Upload Bar -->
         <div class="upload-bar">
           <div class="upload-dropzone" id="dropzone">
-            <input id="fileInput" type="file" accept=".csv" multiple />
+            <input id="fileInput" type="file" accept=".csv,.dfl" multiple />
             <div class="upload-icon">📂</div>
             <div class="upload-text">
-              <strong>Arraste CSVs aqui</strong>
-              <span>ou clique para selecionar</span>
+              <strong>Arraste CSVs ou DFLs aqui</strong>
+              <span>ou clique para selecionar (.csv / .dfl R&amp;S)</span>
             </div>
             <div id="fileList" class="file-list"></div>
           </div>
@@ -500,17 +500,17 @@
             <div class="control-row">
               <div class="axis-picker">
                 <button id="btnPickX" class="secondary" type="button">CSV X</button>
-                <input id="fileInputX" type="file" accept=".csv" class="hidden-input" />
+                <input id="fileInputX" type="file" accept=".csv,.dfl" class="hidden-input" />
                 <span id="axisFileX" class="file-chip axis-file">X: —</span>
               </div>
               <div class="axis-picker">
                 <button id="btnPickY" class="secondary" type="button">CSV Y</button>
-                <input id="fileInputY" type="file" accept=".csv" class="hidden-input" />
+                <input id="fileInputY" type="file" accept=".csv,.dfl" class="hidden-input" />
                 <span id="axisFileY" class="file-chip axis-file">Y: —</span>
               </div>
               <div class="axis-picker">
                 <button id="btnPickZ" class="secondary" type="button">CSV Z</button>
-                <input id="fileInputZ" type="file" accept=".csv" class="hidden-input" />
+                <input id="fileInputZ" type="file" accept=".csv,.dfl" class="hidden-input" />
                 <span id="axisFileZ" class="file-chip axis-file">Z: —</span>
               </div>
             </div>

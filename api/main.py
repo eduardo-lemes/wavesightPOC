@@ -22,6 +22,7 @@ from .database import Base, engine, get_db
 from .models import Analysis, Project, User
 from .security import CORS_ORIGINS, create_access_token, decode_access_token, hash_password, verify_password
 from . import ai_provider
+from .dfl_parser import dfl_to_csv_bytes, DFLParseError
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +179,30 @@ def me(current_user: User = Depends(get_current_user)) -> UserOut:
 
 
 # ─── CSV Processing (internal) ──────────────────────────────────────
+_ALLOWED_EXTENSIONS = {".csv", ".dfl"}
+
+
+def _file_extension(filename: str) -> str:
+    lower = (filename or "").lower()
+    for ext in _ALLOWED_EXTENSIONS:
+        if lower.endswith(ext):
+            return ext
+    return ""
+
+
+def _coerce_to_csv_bytes(file_bytes: bytes, filename: str) -> bytes:
+    """Transparently convert .dfl files to CSV bytes; pass .csv files through as-is."""
+    ext = _file_extension(filename)
+    if ext == ".dfl":
+        try:
+            return dfl_to_csv_bytes(file_bytes)
+        except DFLParseError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Erro ao processar .dfl: {exc}") from exc
+    return file_bytes
+
+
 def _read_csv(file_bytes: bytes) -> pd.DataFrame:
     try:
         df = pd.read_csv(io.BytesIO(file_bytes), sep=None, engine="python", header=None, comment="#")
@@ -459,10 +484,11 @@ async def upload_csv(
 ) -> JSONResponse:
     _ = current_user
     filename = file.filename or ""
-    if not filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Arquivo deve ser .csv")
+    if not _file_extension(filename):
+        raise HTTPException(status_code=400, detail="Arquivo deve ser .csv ou .dfl")
     file_bytes = await file.read()
-    payload = _process_series(file_bytes, filename, smoothing, smoothing_window, peak_min_height, peak_min_distance, max_peaks)
+    csv_bytes = _coerce_to_csv_bytes(file_bytes, filename)
+    payload = _process_series(csv_bytes, filename, smoothing, smoothing_window, peak_min_height, peak_min_distance, max_peaks)
     return JSONResponse(payload)
 
 
@@ -483,10 +509,11 @@ async def upload_csv_multi(
     series = []
     for file in files:
         filename = file.filename or ""
-        if not filename.lower().endswith(".csv"):
-            raise HTTPException(status_code=400, detail=f"Arquivo invalido: {filename}")
+        if not _file_extension(filename):
+            raise HTTPException(status_code=400, detail=f"Arquivo invalido (esperado .csv ou .dfl): {filename}")
         file_bytes = await file.read()
-        series.append(_process_series(file_bytes, filename, smoothing, smoothing_window, peak_min_height, peak_min_distance, max_peaks))
+        csv_bytes = _coerce_to_csv_bytes(file_bytes, filename)
+        series.append(_process_series(csv_bytes, filename, smoothing, smoothing_window, peak_min_height, peak_min_distance, max_peaks))
 
     # Revision comparison
     comparison = _compare_revisions(series)
