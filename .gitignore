@@ -41,3 +41,8 @@ Thumbs.db
 
 # PDFs (generated)
 jaguar.pdf
+
+# Node / Frontend
+frontend-new/node_modules/
+frontend-new/dist/
+frontend-new/.vite/

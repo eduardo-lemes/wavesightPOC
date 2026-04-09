@@ -23,6 +23,7 @@ from .models import Analysis, Project, User
 from .security import CORS_ORIGINS, create_access_token, decode_access_token, hash_password, verify_password
 from . import ai_provider
 from .dfl_parser import dfl_to_csv_bytes, DFLParseError
+from .image_parser import parse_spectrum_image, convert_dbm_to_dbuv, ImageParseError
 
 logger = logging.getLogger(__name__)
 
@@ -286,8 +287,9 @@ def _apply_smoothing(y: np.ndarray, method: str, window: int) -> np.ndarray:
     if method == "moving":
         if window <= 1:
             return y
-        kernel = np.ones(window, dtype=float) / float(window)
-        return np.convolve(y, kernel, mode="same")
+        # Use uniform_filter1d instead of convolve to avoid edge distortion
+        from scipy.ndimage import uniform_filter1d
+        return uniform_filter1d(y.astype(float), size=window, mode="nearest")
     if method == "savgol":
         try:
             from scipy.signal import savgol_filter
@@ -310,8 +312,14 @@ def _analyze_patterns(freq: np.ndarray, inten: np.ndarray, peaks_idx: List[int],
     if len(peaks) < 3:
         return {}
 
-    # Harmonic detection
-    candidates = sorted(peaks, key=lambda p: p[1], reverse=True)[:10]
+    # Adaptive tolerance: 2% above 10 MHz, 5% below 10 MHz (lower freq resolution in CSV)
+    def get_tol(f: float) -> float:
+        return 0.05 if f < 10.0 else tol_ratio
+
+    # Harmonic detection — test top 20 peaks as fundamental candidates (not just 10)
+    # Also test sub-harmonics: if peaks at 200, 400, 600 MHz, fundamental could be 200 MHz
+    # but also check if 100 MHz (not present) would explain them as 2nd, 4th, 6th harmonics
+    candidates = sorted(peaks, key=lambda p: p[1], reverse=True)[:20]
     best = None
     for f0, _ in candidates:
         if f0 <= 0:
@@ -324,7 +332,8 @@ def _analyze_patterns(freq: np.ndarray, inten: np.ndarray, peaks_idx: List[int],
             target = n * f0
             if target <= 0:
                 continue
-            if abs(f - target) <= tol_ratio * target:
+            tol = get_tol(target)
+            if abs(f - target) / target <= tol:
                 matches.append((n, f, amp))
         if best is None or len(matches) > len(best["matches"]):
             best = {"f0": f0, "matches": matches}
@@ -337,7 +346,7 @@ def _analyze_patterns(freq: np.ndarray, inten: np.ndarray, peaks_idx: List[int],
             "matches": [{"n": n, "frequency": f, "intensity": amp} for n, f, amp in sorted(best["matches"], key=lambda x: x[0])],
         }
 
-    # Spacing detection
+    # Spacing detection — find regularly spaced peaks (common in switching regulators)
     peaks_sorted = sorted(peaks, key=lambda p: p[0])
     diffs = [peaks_sorted[i + 1][0] - peaks_sorted[i][0] for i in range(len(peaks_sorted) - 1)]
     diffs = [d for d in diffs if d > 0]
@@ -347,7 +356,8 @@ def _analyze_patterns(freq: np.ndarray, inten: np.ndarray, peaks_idx: List[int],
         for d in diffs:
             placed = False
             for idx, (center, count) in enumerate(clusters):
-                if abs(d - center) <= tol_ratio * center:
+                tol = get_tol(center)
+                if abs(d - center) / center <= tol:
                     new_center = (center * count + d) / (count + 1)
                     clusters[idx] = (new_center, count + 1)
                     placed = True
@@ -366,10 +376,22 @@ def _analyze_patterns(freq: np.ndarray, inten: np.ndarray, peaks_idx: List[int],
     return patterns
 
 
-def _classify_emission(patterns: Dict[str, Any], peaks_count: int) -> str:
-    """Classify emission type based on detected patterns."""
+def _classify_emission(patterns: Dict[str, Any], peaks_count: int, freq: np.ndarray) -> str:
+    """Classify emission type based on detected patterns and spectral density.
+
+    Uses peak density (peaks per 100 MHz) rather than absolute count to avoid
+    false broadband classification on wide-span sweeps.
+    """
     has_harmonics = "harmonics" in patterns and patterns["harmonics"].get("count", 0) >= 3
-    has_broadband = peaks_count > 50 and "harmonics" not in patterns
+
+    # Calculate span in MHz to normalize peak density
+    span_mhz = float(freq[-1] - freq[0]) if len(freq) > 1 else 1.0
+    span_mhz = max(span_mhz, 1.0)
+    peak_density = (peaks_count / span_mhz) * 100  # peaks per 100 MHz
+
+    # Broadband: high peak density without harmonic structure
+    # >5 peaks/100 MHz without harmonics suggests broadband noise
+    has_broadband = peak_density > 5 and "harmonics" not in patterns
 
     if has_harmonics and has_broadband:
         return "mixed"
@@ -427,7 +449,7 @@ def _process_series(
     peaks = [{"frequency": float(freq[i]), "intensity": float(inten[i])} for i in peaks_idx_sorted]
     stats = _basic_stats(inten)
     patterns = _analyze_patterns(freq, inten, peaks_idx_sorted)
-    emission_type = _classify_emission(patterns, len(peaks_idx))
+    emission_type = _classify_emission(patterns, len(peaks_idx), freq)
 
     return {
         "filename": filename,
@@ -728,6 +750,90 @@ def delete_project(project_id: int, current_user: User = Depends(get_current_use
     db.delete(project)
     db.commit()
     return JSONResponse({"message": "Projeto removido"})
+
+
+# ─── Image Upload Endpoint ──────────────────────────────────────────
+@app.post("/upload-image")
+async def upload_image(
+    file: UploadFile = File(...),
+    impedance: float = Query(50.0, description="Impedância do sistema em Ohms (50 ou 75)"),
+    trace: str = Query("auto", description="Trace: auto, PkMax, AvMax, Clrw, MinHold"),
+    smoothing: Optional[str] = None,
+    smoothing_window: Optional[int] = None,
+    peak_min_height: Optional[float] = None,
+    peak_min_distance: Optional[int] = None,
+    max_peaks: int = 200,
+    current_user: User = Depends(get_current_user),
+) -> JSONResponse:
+    """
+    Upload a spectrum analyzer screenshot (PNG/JPG/BMP) and extract trace data.
+    Supports R&S EMC32 and similar displays.
+    Automatically converts dBm → dBµV using the specified impedance.
+    """
+    _ = current_user
+    filename = file.filename or "screenshot"
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+    if ext not in {"png", "jpg", "jpeg", "bmp", "tiff", "tif"}:
+        raise HTTPException(status_code=400, detail="Formato não suportado. Use PNG, JPG ou BMP.")
+
+    image_bytes = await file.read()
+    if len(image_bytes) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Imagem muito grande (máx 20 MB).")
+
+    try:
+        parsed = parse_spectrum_image(image_bytes)
+    except ImageParseError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Image parse error: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao processar imagem: {e}")
+
+    metadata = parsed["metadata"]
+    traces   = parsed["traces"]
+
+    # Select trace
+    if trace == "auto":
+        selected = parsed["primary_trace"]
+    else:
+        selected = next((t for t in traces if t["name"] == trace), parsed["primary_trace"])
+
+    freq_arr = selected["frequency"]
+    amp_arr  = selected["intensity"]
+    unit     = metadata.get("unit", "dBm")
+
+    # Convert dBm → dBµV
+    converted = False
+    if "dBm" in unit:
+        amp_arr = convert_dbm_to_dbuv(amp_arr, impedance_ohm=impedance)
+        unit = "dBµV"
+        converted = True
+
+    # Build synthetic CSV and process normally
+    csv_lines = ["freq_mhz,amplitude_dbuv"] + [f"{f},{a}" for f, a in zip(freq_arr, amp_arr)]
+    csv_bytes = "\n".join(csv_lines).encode()
+
+    payload = _process_series(
+        csv_bytes, filename,
+        smoothing, smoothing_window,
+        peak_min_height, peak_min_distance, max_peaks,
+    )
+
+    payload["image_metadata"] = {
+        **metadata,
+        "unit_original": metadata.get("unit", "dBm"),
+        "unit_processed": unit,
+        "converted_to_dbuv": converted,
+        "impedance_ohm": impedance,
+        "trace_used": selected["name"],
+        "traces_available": [t["name"] for t in traces],
+        "detector_assumed": selected.get("detector", "pk"),
+    }
+
+    ai_data = _build_ai_data([payload])
+    ai_data["image_metadata"] = payload["image_metadata"]
+    payload["ai_insights"] = await ai_provider.analyze(ai_data)
+
+    return JSONResponse(payload)
 
 
 # ─── Demo Endpoint ──────────────────────────────────────────────────

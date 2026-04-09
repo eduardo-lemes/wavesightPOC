@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 280" role="img" aria-label="WaveSight">
+  <defs>
+    <linearGradient id="wsWave" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#57d6ff" stop-opacity="0.85"/>
+      <stop offset="0.55" stop-color="#2bbcff" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#00d4a4" stop-opacity="0.85"/>
+    </linearGradient>
+    <filter id="wsGlow" x="-20%" y="-40%" width="140%" height="180%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feColorMatrix in="blur" type="matrix"
+        values="
+          0 0 0 0 0.20
+          0 0 0 0 0.75
+          0 0 0 0 1
+          0 0 0 0.9 0" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- dotted baseline -->
+  <g opacity="0.5">
+    <g fill="#57d6ff" opacity="0.45">
+      <rect x="40" y="140" width="6" height="6" rx="2"/>
+      <rect x="60" y="140" width="6" height="6" rx="2"/>
+      <rect x="80" y="140" width="6" height="6" rx="2"/>
+      <rect x="100" y="140" width="6" height="6" rx="2"/>
+      <rect x="120" y="140" width="6" height="6" rx="2"/>
+      <rect x="140" y="140" width="6" height="6" rx="2"/>
+      <rect x="160" y="140" width="6" height="6" rx="2"/>
+      <rect x="180" y="140" width="6" height="6" rx="2"/>
+      <rect x="200" y="140" width="6" height="6" rx="2"/>
+      <rect x="220" y="140" width="6" height="6" rx="2"/>
+      <rect x="240" y="140" width="6" height="6" rx="2"/>
+      <rect x="260" y="140" width="6" height="6" rx="2"/>
+      <rect x="280" y="140" width="6" height="6" rx="2"/>
+      <rect x="300" y="140" width="6" height="6" rx="2"/>
+      <rect x="320" y="140" width="6" height="6" rx="2"/>
+      <rect x="340" y="140" width="6" height="6" rx="2"/>
+      <rect x="360" y="140" width="6" height="6" rx="2"/>
+      <rect x="380" y="140" width="6" height="6" rx="2"/>
+      <rect x="400" y="140" width="6" height="6" rx="2"/>
+      <rect x="420" y="140" width="6" height="6" rx="2"/>
+      <rect x="440" y="140" width="6" height="6" rx="2"/>
+      <rect x="460" y="140" width="6" height="6" rx="2"/>
+      <rect x="480" y="140" width="6" height="6" rx="2"/>
+      <rect x="500" y="140" width="6" height="6" rx="2"/>
+      <rect x="520" y="140" width="6" height="6" rx="2"/>
+      <rect x="540" y="140" width="6" height="6" rx="2"/>
+      <rect x="560" y="140" width="6" height="6" rx="2"/>
+      <rect x="580" y="140" width="6" height="6" rx="2"/>
+      <rect x="600" y="140" width="6" height="6" rx="2"/>
+      <rect x="620" y="140" width="6" height="6" rx="2"/>
+      <rect x="640" y="140" width="6" height="6" rx="2"/>
+      <rect x="660" y="140" width="6" height="6" rx="2"/>
+      <rect x="680" y="140" width="6" height="6" rx="2"/>
+      <rect x="700" y="140" width="6" height="6" rx="2"/>
+      <rect x="720" y="140" width="6" height="6" rx="2"/>
+      <rect x="740" y="140" width="6" height="6" rx="2"/>
+      <rect x="760" y="140" width="6" height="6" rx="2"/>
+      <rect x="780" y="140" width="6" height="6" rx="2"/>
+      <rect x="800" y="140" width="6" height="6" rx="2"/>
+      <rect x="820" y="140" width="6" height="6" rx="2"/>
+      <rect x="840" y="140" width="6" height="6" rx="2"/>
+      <rect x="860" y="140" width="6" height="6" rx="2"/>
+      <rect x="880" y="140" width="6" height="6" rx="2"/>
+      <rect x="900" y="140" width="6" height="6" rx="2"/>
+      <rect x="920" y="140" width="6" height="6" rx="2"/>
+    </g>
+  </g>
+
+  <!-- wave -->
+  <g filter="url(#wsGlow)">
+    <path d="M 70 140
+             C 140 140, 145 140, 190 140
+             C 240 140, 245 85, 300 85
+             C 355 85, 360 155, 420 155
+             C 480 155, 495 70, 560 70
+             C 625 70, 635 170, 700 170
+             C 765 170, 780 100, 835 100
+             C 890 100, 900 140, 940 140"
+          fill="none" stroke="url(#wsWave)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 70 140
+             C 140 140, 145 140, 190 140
+             C 240 140, 245 110, 285 110
+             C 325 110, 340 150, 390 150
+             C 440 150, 460 105, 520 105
+             C 580 105, 600 160, 660 160
+             C 720 160, 760 120, 820 120
+             C 880 120, 900 140, 940 140"
+          fill="none" stroke="#57d6ff" stroke-opacity="0.45" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- wordmark -->
+  <g transform="translate(0, 0)">
+    <text x="110" y="250"
+      font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif"
+      font-size="96" font-weight="300" letter-spacing="0.5">
+      <tspan fill="#b8c0c7">Wave</tspan><tspan fill="#57d6ff" font-weight="400">Sight</tspan>
+    </text>
+  </g>
+</svg>
+
