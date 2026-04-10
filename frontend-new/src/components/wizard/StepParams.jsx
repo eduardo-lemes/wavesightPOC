@@ -10,6 +10,22 @@ const PRESETS = [
   { id: 'aggressive', label: 'Agressivo',   desc: 'Detecta o máximo de picos',  color: 'rgba(255,175,75,0.12)'  },
 ]
 
+const NORMS = [
+  { id: 'none',         label: 'Sem norma',              desc: 'Análise livre, sem limite de referência',                  icon: '📊', limit: 'none' },
+  { id: 're310',        label: 'JLR RE310 Level 2',      desc: 'Emissões radiadas — 24 bandas, PK→AV→QP',                 icon: '🚗', limit: 'none' },
+  { id: 'cispr25_c1',   label: 'CISPR 25 Class 1',       desc: 'Automotivo relaxado — uso geral',                          icon: '📋', limit: 'cispr_a' },
+  { id: 'cispr25_c2',   label: 'CISPR 25 Class 2',       desc: 'Automotivo intermediário baixo',                            icon: '📋', limit: 'cispr_c2' },
+  { id: 'cispr25_c3',   label: 'CISPR 25 Class 3',       desc: 'Automotivo padrão — mais comum',                            icon: '🔧', limit: 'cispr_b' },
+  { id: 'cispr25_c4',   label: 'CISPR 25 Class 4',       desc: 'Automotivo premium — intermediário alto',                   icon: '🔧', limit: 'cispr_c4' },
+  { id: 'cispr25_c5',   label: 'CISPR 25 Class 5',       desc: 'Mais restritivo — áudio/navegação',                        icon: '🎯', limit: 'cispr_class5' },
+  { id: 'cispr32_a',    label: 'CISPR 32 Class A',       desc: 'Multimedia — comercial/industrial',                         icon: '🖥️', limit: 'cispr32_a' },
+  { id: 'cispr32_b',    label: 'CISPR 32 Class B',       desc: 'Multimedia — residencial',                                  icon: '🖥️', limit: 'cispr32_b' },
+  { id: 'fcc_a',        label: 'FCC Part 15 Class A',    desc: 'EUA — comercial/industrial',                                icon: '🇺🇸', limit: 'fcc_a' },
+  { id: 'fcc_b',        label: 'FCC Part 15 Class B',    desc: 'EUA — residencial',                                         icon: '🇺🇸', limit: 'fcc_b' },
+  { id: 'iec_res',      label: 'IEC 61000-6-3',          desc: 'Genérico residencial',                                      icon: '🏠', limit: 'iec_generic' },
+  { id: 'iec_ind',      label: 'IEC 61000-6-4',          desc: 'Genérico industrial',                                       icon: '🏭', limit: 'iec_industrial' },
+]
+
 const Toggle = ({ label, hint, checked, onChange }) => (
   <label className="flex items-center justify-between gap-3 cursor-pointer group">
     <div>
@@ -27,8 +43,36 @@ export default function StepParams() {
   const { params, setParam, applyPreset, setStep, process, loading, error, files } = useStore()
   const tog = (key, def = true) => setParam(key, !(params[key] ?? def))
 
+  const selectedNorm = params.norm || 'none'
+  const selectNorm = (normId) => {
+    const norm = NORMS.find(n => n.id === normId)
+    if (norm) {
+      setParam('norm', normId)
+      setParam('limit_preset', norm.limit)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-8">
+
+      {/* Norm selection */}
+      <div>
+        <div className="text-xs text-muted uppercase tracking-widest mb-3">Norma de referência</div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {NORMS.map(({ id, label, desc, icon }) => (
+            <motion.button key={id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              onClick={() => selectNorm(id)}
+              className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all
+                ${selectedNorm === id ? 'border-accent/40 bg-accent/5' : 'border-[#1f2a36] hover:border-white/20 bg-panel'}`}>
+              <span className="text-lg flex-none mt-0.5">{icon}</span>
+              <div>
+                <div className={`text-sm font-semibold ${selectedNorm === id ? 'text-accent' : 'text-white/80'}`}>{label}</div>
+                <div className="text-xs text-muted mt-0.5 leading-relaxed">{desc}</div>
+              </div>
+            </motion.button>
+          ))}
+        </div>
+      </div>
 
       {/* Presets */}
       <div>
@@ -110,16 +154,12 @@ export default function StepParams() {
 
         {/* Limits */}
         <div className="flex flex-col gap-4 p-5 rounded-2xl border border-[#1f2a36] bg-panel">
-          <div className="text-sm font-semibold">Limite / Norma</div>
+          <div className="text-sm font-semibold">Visualização</div>
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-muted">Preset de limite</label>
-            <select className="input" value={params.limit_preset} onChange={(e) => setParam('limit_preset', e.target.value)}>
-              <option value="none">Nenhum</option>
-              <option value="cispr_a">CISPR 25 Class 1 — PK (relaxado)</option>
-              <option value="cispr_b">CISPR 25 Class 3 — PK (automotivo padrão)</option>
-              <option value="cispr_class5">CISPR 25 Class 5 — PK (mais restritivo)</option>
-              <option value="iec_generic">IEC 61000-6-3 (residencial)</option>
-            </select>
+            <label className="text-xs text-muted">Limite ativo</label>
+            <div className="text-sm text-white/70 px-3 py-2 rounded-lg bg-[#0f151d] border border-[#1f2a36]">
+              {NORMS.find(n => n.id === selectedNorm)?.label || 'Nenhum'}
+            </div>
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-xs text-muted">Máx pontos (decimação)</label>

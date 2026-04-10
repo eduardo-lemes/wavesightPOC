@@ -51,10 +51,12 @@ def test_analyze_patterns_empty():
 
 def test_classify_emission():
     from api.main import _classify_emission
-    assert _classify_emission({"harmonics": {"count": 5}}, 10) == "narrowband"
-    assert _classify_emission({"harmonics": {"count": 5}}, 60) == "narrowband"  # harmonics dominate
-    assert _classify_emission({}, 60) == "broadband"  # >50 peaks, no harmonics
-    assert _classify_emission({}, 5) == "indeterminate"
+    freq_short = np.linspace(0, 100, 200)
+    freq_wide = np.linspace(0, 1000, 200)
+    assert _classify_emission({"harmonics": {"count": 5}}, 10, freq_short) == "narrowband"
+    assert _classify_emission({"harmonics": {"count": 5}}, 60, freq_wide) == "narrowband"  # harmonics dominate
+    assert _classify_emission({}, 60, freq_short) == "broadband"  # high density, no harmonics
+    assert _classify_emission({}, 5, freq_wide) == "indeterminate"
 
 
 def test_compare_revisions():

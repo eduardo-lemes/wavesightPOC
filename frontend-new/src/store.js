@@ -38,6 +38,8 @@ export const useStore = create((set, get) => ({
     freq_max: '',
     max_points: 5000,
     limit_preset: 'none',
+    norm: 'none',
+    project_id: null,
   },
   setParam: (key, value) =>
     set((s) => ({ params: { ...s.params, [key]: value } })),
@@ -68,6 +70,7 @@ export const useStore = create((set, get) => ({
       if (params.peak_min_height !== '') fd.append('peak_min_height', params.peak_min_height)
       if (params.peak_min_distance !== '') fd.append('peak_min_distance', params.peak_min_distance)
       if (params.max_peaks) fd.append('max_peaks', params.max_peaks)
+      if (params.project_id) fd.append('project_id', params.project_id)
     }
 
     try {

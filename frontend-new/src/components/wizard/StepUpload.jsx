@@ -1,11 +1,41 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { useStore } from '../../store'
+import { useStore, authFetch } from '../../store'
 import { motion } from 'framer-motion'
-import { UploadCloud, X, FileText, ArrowRight } from 'lucide-react'
+import { UploadCloud, X, FileText, ArrowRight, FolderOpen, Plus } from 'lucide-react'
 
 export default function StepUpload() {
-  const { files, setFiles, setStep } = useStore()
+  const { files, setFiles, setStep, params, setParam } = useStore()
+  const [projects, setProjects] = useState([])
+  const [loadingProjects, setLoadingProjects] = useState(true)
+  const [showNewProject, setShowNewProject] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    authFetch('/projects')
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setProjects(Array.isArray(d) ? d : []))
+      .catch(() => {})
+      .finally(() => setLoadingProjects(false))
+  }, [])
+
+  const createProject = async () => {
+    if (!newProjectName.trim()) return
+    setCreating(true)
+    try {
+      const res = await authFetch('/projects', { method: 'POST', body: JSON.stringify({ name: newProjectName.trim() }) })
+      if (res.ok) {
+        const data = await res.json()
+        const refreshed = await authFetch('/projects').then(r => r.ok ? r.json() : projects)
+        setProjects(Array.isArray(refreshed) ? refreshed : projects)
+        setParam('project_id', data.id)
+        setNewProjectName('')
+        setShowNewProject(false)
+      }
+    } catch {}
+    setCreating(false)
+  }
 
   const onDrop = useCallback((accepted) => {
     const current = useStore.getState().files
@@ -47,6 +77,46 @@ export default function StepUpload() {
             <span key={t} className="text-xs px-3 py-1 rounded-full border border-[#1f2a36] bg-chip text-muted">{t}</span>
           ))}
         </div>
+      </div>
+
+      {/* Project selector */}
+      <div className="flex flex-col gap-3 p-5 rounded-2xl border border-[#1f2a36] bg-panel">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FolderOpen size={16} className="text-[#8b7bff]" />
+            <span className="text-sm font-semibold">Projeto</span>
+          </div>
+          {!showNewProject && (
+            <button onClick={() => setShowNewProject(true)}
+              className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors">
+              <Plus size={12} /> Novo projeto
+            </button>
+          )}
+        </div>
+        {showNewProject ? (
+          <div className="flex gap-2">
+            <input className="input flex-1 text-sm" placeholder="Nome do projeto" value={newProjectName}
+              onChange={e => setNewProjectName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && createProject()} autoFocus />
+            <button onClick={createProject} disabled={creating || !newProjectName.trim()}
+              className="px-4 py-2 rounded-lg text-xs font-semibold text-[#081018] disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg, #57d6ff, #00d4a4)' }}>
+              {creating ? '...' : 'Criar'}
+            </button>
+            <button onClick={() => setShowNewProject(false)}
+              className="px-3 py-2 rounded-lg text-xs text-muted hover:text-white border border-[#1f2a36]">
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <select className="input text-sm" value={params.project_id || ''}
+            onChange={e => setParam('project_id', e.target.value ? Number(e.target.value) : null)}>
+            <option value="">Sem projeto (avulso)</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>{p.name} ({p.analysis_count || 0} análises)</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* File list */}

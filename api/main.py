@@ -24,15 +24,25 @@ from .security import CORS_ORIGINS, create_access_token, decode_access_token, ha
 from . import ai_provider
 from .dfl_parser import dfl_to_csv_bytes, DFLParseError
 from .image_parser import parse_spectrum_image, convert_dbm_to_dbuv, ImageParseError
+from .logging_config import setup_logging
+
+setup_logging()
 
 logger = logging.getLogger(__name__)
 
 limiter = Limiter(key_func=get_remote_address)
 
+_APP_VERSION = "1.0.0"
+_START_TIME = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import time
+    global _START_TIME
+    _START_TIME = time.time()
     Base.metadata.create_all(bind=engine)
+    logger.info("WaveSight API started v%s", _APP_VERSION)
     yield
 
 
@@ -48,6 +58,9 @@ app.add_middleware(
 )
 
 security = HTTPBearer(auto_error=False)
+
+# Cookie name for httpOnly JWT
+_AUTH_COOKIE = "wavesight_token"
 
 
 # ─── Pydantic Schemas ──────────────────────────────────────────────
@@ -121,12 +134,18 @@ def _user_to_out(user: User) -> UserOut:
 
 
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
-    if not credentials:
+    # Try Bearer header first, then httpOnly cookie
+    token = None
+    if credentials:
+        token = credentials.credentials
+    if not token:
+        token = request.cookies.get(_AUTH_COOKIE)
+    if not token:
         raise HTTPException(status_code=401, detail="Nao autenticado")
-    token = credentials.credentials
     try:
         subject = decode_access_token(token)
         user_id = int(subject)
@@ -136,6 +155,21 @@ def get_current_user(
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Usuario invalido")
     return user
+
+
+def _set_auth_cookie(response: JSONResponse, token: str) -> JSONResponse:
+    """Set httpOnly secure cookie with the JWT token."""
+    from .security import ACCESS_TOKEN_EXPIRE_MINUTES
+    response.set_cookie(
+        key=_AUTH_COOKIE,
+        value=token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+    return response
 
 
 # ─── Auth Endpoints ─────────────────────────────────────────────────
@@ -157,7 +191,9 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     db.commit()
     db.refresh(user)
     token = create_access_token(str(user.id))
-    return AuthResponse(access_token=token, token_type="bearer", user=_user_to_out(user))
+    body = AuthResponse(access_token=token, token_type="bearer", user=_user_to_out(user))
+    response = JSONResponse(body.model_dump())
+    return _set_auth_cookie(response, token)
 
 
 @app.post("/auth/login", response_model=AuthResponse)
@@ -171,12 +207,21 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
     if not user.is_active:
         raise HTTPException(status_code=401, detail="Usuario inativo")
     token = create_access_token(str(user.id))
-    return AuthResponse(access_token=token, token_type="bearer", user=_user_to_out(user))
+    body = AuthResponse(access_token=token, token_type="bearer", user=_user_to_out(user))
+    response = JSONResponse(body.model_dump())
+    return _set_auth_cookie(response, token)
 
 
 @app.get("/auth/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)) -> UserOut:
     return _user_to_out(current_user)
+
+
+@app.post("/auth/logout")
+def logout_endpoint() -> JSONResponse:
+    response = JSONResponse({"message": "Logout realizado"})
+    response.delete_cookie(_AUTH_COOKIE, path="/")
+    return response
 
 
 # ─── CSV Processing (internal) ──────────────────────────────────────
@@ -490,39 +535,84 @@ def _build_ai_data(series: List[Dict[str, Any]], comparison: Dict[str, Any] | No
 
 # ─── API Endpoints ──────────────────────────────────────────────────
 @app.get("/health")
-def health() -> Dict[str, str]:
-    return {"status": "ok"}
+def health(db: Session = Depends(get_db)) -> JSONResponse:
+    import time
+    from . import ai_provider as _ai
+    from .storage import _is_configured as s3_configured, S3_BUCKET
+
+    # DB check
+    db_ok = False
+    try:
+        db.execute(select(User).limit(1))
+        db_ok = True
+    except Exception:
+        pass
+
+    # Uptime
+    uptime_s = round(time.time() - _START_TIME, 1) if _START_TIME else None
+
+    return JSONResponse({
+        "status": "ok" if db_ok else "degraded",
+        "version": _APP_VERSION,
+        "database": "connected" if db_ok else "unreachable",
+        "ai_provider": _ai.AI_PROVIDER if _ai._is_configured() else "none",
+        "ai_model": _ai.AI_MODEL if _ai._is_configured() else None,
+        "storage": f"s3://{S3_BUCKET}" if s3_configured() else "local",
+        "uptime_seconds": uptime_s,
+    })
 
 
 @app.post("/upload")
+@limiter.limit("30/minute")
 async def upload_csv(
+    request: Request,
     file: UploadFile = File(...),
     smoothing: Optional[str] = None,
     smoothing_window: Optional[int] = None,
     peak_min_height: Optional[float] = None,
     peak_min_distance: Optional[int] = None,
     max_peaks: int = 200,
+    project_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> JSONResponse:
-    _ = current_user
     filename = file.filename or ""
     if not _file_extension(filename):
         raise HTTPException(status_code=400, detail="Arquivo deve ser .csv ou .dfl")
     file_bytes = await file.read()
     csv_bytes = _coerce_to_csv_bytes(file_bytes, filename)
     payload = _process_series(csv_bytes, filename, smoothing, smoothing_window, peak_min_height, peak_min_distance, max_peaks)
+
+    # Auto-save as report (same as upload-multi)
+    import json as _json
+    analysis = Analysis(
+        user_id=current_user.id,
+        filename=filename,
+        params_json=_json.dumps({"min_height": peak_min_height, "min_distance": peak_min_distance, "max_peaks": max_peaks}),
+        results_json=_json.dumps([payload]),
+        emission_type=payload.get("emission_type"),
+        project_id=project_id,
+    )
+    db.add(analysis)
+    db.commit()
+    db.refresh(analysis)
+    payload["report_id"] = analysis.id
     return JSONResponse(payload)
 
 
 @app.post("/upload-multi")
+@limiter.limit("20/minute")
 async def upload_csv_multi(
+    request: Request,
     files: List[UploadFile] = File(...),
     smoothing: Optional[str] = None,
     smoothing_window: Optional[int] = None,
     peak_min_height: Optional[float] = None,
     peak_min_distance: Optional[int] = None,
     max_peaks: int = 200,
+    project_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> JSONResponse:
     _ = current_user
     if not files:
@@ -554,7 +644,6 @@ async def upload_csv_multi(
 
     # Auto-save as report
     import json as _json
-    db = next(get_db())
     filenames = ", ".join(f.filename or "unknown" for f in files)
     emission = series[0].get("emission_type") if series else None
     analysis = Analysis(
@@ -564,6 +653,7 @@ async def upload_csv_multi(
         results_json=_json.dumps(series),
         ai_insights=ai_insights,
         emission_type=emission,
+        project_id=project_id,
     )
     db.add(analysis)
     db.commit()
@@ -754,7 +844,9 @@ def delete_project(project_id: int, current_user: User = Depends(get_current_use
 
 # ─── Image Upload Endpoint ──────────────────────────────────────────
 @app.post("/upload-image")
+@limiter.limit("20/minute")
 async def upload_image(
+    request: Request,
     file: UploadFile = File(...),
     impedance: float = Query(50.0, description="Impedância do sistema em Ohms (50 ou 75)"),
     trace: str = Query("auto", description="Trace: auto, PkMax, AvMax, Clrw, MinHold"),
@@ -834,6 +926,52 @@ async def upload_image(
     payload["ai_insights"] = await ai_provider.analyze(ai_data)
 
     return JSONResponse(payload)
+
+
+# ─── PDF Report Endpoint ────────────────────────────────────────────
+@app.get("/analyses/{analysis_id}/pdf")
+def download_pdf(
+    analysis_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate and download a PDF report for an analysis."""
+    from fastapi.responses import Response
+    from .pdf_report import generate_pdf
+
+    analysis = db.get(Analysis, analysis_id)
+    if not analysis or analysis.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Analise nao encontrada")
+
+    # Get project name if associated
+    project_name = None
+    if analysis.project_id:
+        project = db.get(Project, analysis.project_id)
+        if project:
+            project_name = project.name
+
+    try:
+        pdf_bytes = generate_pdf(
+            analysis_data={
+                "filename": analysis.filename,
+                "results_json": analysis.results_json,
+                "ai_insights": analysis.ai_insights,
+                "emission_type": analysis.emission_type,
+            },
+            project_name=project_name,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=501, detail=str(e))
+    except Exception as e:
+        logger.error(f"PDF generation failed: {e}")
+        raise HTTPException(status_code=500, detail="Falha ao gerar PDF")
+
+    safe_name = (analysis.filename or "report").replace(",", "_").replace(" ", "_")[:50]
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="wavesight-{safe_name}.pdf"'},
+    )
 
 
 # ─── Demo Endpoint ──────────────────────────────────────────────────

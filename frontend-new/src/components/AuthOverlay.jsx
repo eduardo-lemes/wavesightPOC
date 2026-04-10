@@ -49,7 +49,7 @@ export default function AuthOverlay() {
         {/* Hero */}
         <div className="hidden md:flex flex-col gap-5 p-8 border-r border-[#1f2a36]"
           style={{ background: 'radial-gradient(700px 420px at 20% 18%, rgba(87,214,255,0.12) 0%, transparent 60%)' }}>
-          <img src="/assets/logo.png" alt="WaveSight" className="w-40 rounded-xl" />
+          <img src="/assets/wavesight-logo.svg" alt="WaveSight" className="w-40 rounded-xl" />
           <div>
             <div className="text-lg font-bold text-white">Transforme medições em insights.</div>
             <p className="text-sm text-muted mt-1">Envie medições EMC, compare curvas, aplique limites e exporte relatórios.</p>

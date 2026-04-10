@@ -358,6 +358,21 @@ export default function StepResults() {
   const exportPDF = async () => {
     setExportLoading('pdf')
     try {
+      // Try native PDF from backend first (if report was saved)
+      const reportId = results?.report_id
+      if (reportId) {
+        const res = await fetch(`/api/analyses/${reportId}/pdf`, {
+          headers: useStore.getState().token ? { Authorization: `Bearer ${useStore.getState().token}` } : {},
+        })
+        if (res.ok) {
+          const blob = await res.blob()
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'wavesight-relatorio.pdf'; a.click()
+          toast('PDF baixado', 'ok')
+          setExportLoading(null)
+          return
+        }
+      }
+      // Fallback: browser print
       const dataUrl = await getChartImage()
       const win = window.open('', '_blank')
       if (!win) { toast('Pop-up bloqueado', 'error'); return }
@@ -399,11 +414,15 @@ export default function StepResults() {
   )
 
   const kpis = [
-    { label: 'Picos detectados', value: allPeaks.length, Icon: TrendingUp, color: 'text-accent' },
-    { label: 'Amplitude máx', value: first?.stats?.max != null ? `${first.stats.max.toFixed(1)} dBµV` : '—', Icon: Activity, color: 'text-[#ffaf4b]' },
-    { label: 'Tipo de emissão', value: emissionType || '—', Icon: Zap, color: 'text-[#8b7bff]' },
+    { label: 'Picos detectados', value: allPeaks.length, Icon: TrendingUp, color: 'text-accent',
+      tooltip: 'Quantidade de picos de emissão encontrados no espectro. Cada pico é uma frequência onde a intensidade se destaca acima do ruído.' },
+    { label: 'Amplitude máx', value: first?.stats?.max != null ? `${first.stats.max.toFixed(1)} dBµV` : '—', Icon: Activity, color: 'text-[#ffaf4b]',
+      tooltip: 'Maior valor de intensidade medido em todo o espectro (em dBµV). Quanto maior, mais forte a emissão naquela frequência.' },
+    { label: 'Tipo de emissão', value: emissionType || '—', Icon: Zap, color: 'text-[#8b7bff]',
+      tooltip: 'Classificação automática: narrowband = picos isolados (ex: clock), broadband = ruído espalhado (ex: chaveamento), mixed = ambos, indeterminate = inconclusivo.' },
     { label: compliance ? 'Compliance' : 'Séries', value: compliance || series.length,
-      Icon: Layers, color: compliance === 'PASS' ? 'text-[#00d4a4]' : compliance === 'FAIL' ? 'text-red-400' : 'text-[#00d4a4]' },
+      Icon: Layers, color: compliance === 'PASS' ? 'text-[#00d4a4]' : compliance === 'FAIL' ? 'text-red-400' : 'text-[#00d4a4]',
+      tooltip: compliance ? 'Resultado geral: PASS = todas as emissões abaixo do limite da norma. FAIL = pelo menos uma emissão acima do limite.' : 'Quantidade de arquivos/séries carregados nesta análise.' },
   ]
 
   // Build tabs dynamically based on options
@@ -425,14 +444,32 @@ export default function StepResults() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {kpis.map(({ label, value, Icon, color }, i) => (
+        {kpis.map(({ label, value, Icon, color, tooltip }, i) => (
           <motion.div key={label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-            className="flex flex-col gap-2 p-4 rounded-2xl border border-[#1f2a36] bg-panel">
-            <div className="flex items-center gap-2"><Icon size={14} className={color} /><span className="text-xs text-muted">{label}</span></div>
+            title={tooltip}
+            className="flex flex-col gap-2 p-4 rounded-2xl border border-[#1f2a36] bg-panel cursor-help group relative">
+            <div className="flex items-center gap-2">
+              <Icon size={14} className={color} />
+              <span className="text-xs text-muted">{label}</span>
+              <span className="text-[10px] text-muted/50 opacity-0 group-hover:opacity-100 transition-opacity">ⓘ</span>
+            </div>
             <div className={`text-xl font-bold ${color}`}>{value}</div>
+            {tooltip && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-[#0f151d] border border-[#1f2a36] text-xs text-muted leading-relaxed w-64 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
+                {tooltip}
+              </div>
+            )}
           </motion.div>
         ))}
       </div>
+
+      {/* Pre-compliance disclaimer */}
+      {(compliance || limitPreset !== 'none') && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#1f2a36] text-[10px] text-muted bg-panel">
+          <span>⚠️</span>
+          <span>Análise de pre-compliance — valores de referência para preparação. Para certificação formal, consulte a norma oficial vigente e utilize receptor EMC com detector correto.</span>
+        </div>
+      )}
 
       {/* Image metadata banner */}
       {imageMeta && (
@@ -689,7 +726,7 @@ export default function StepResults() {
         </button>
         <div className="flex items-center gap-2 flex-wrap">
           <ExportBtn id="html"  label="HTML"   Icon={FileText} onClick={exportHTML}  />
-          <ExportBtn id="pdf"   label="PDF"    Icon={Printer}  onClick={exportPDF}   />
+          <ExportBtn id="pdf"   label="PDF Relatório" Icon={Download} onClick={exportPDF} />
           <ExportBtn id="image" label="Imagem" Icon={Image}    onClick={exportImage} />
           <button onClick={resetWizard}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#1f2a36] text-muted hover:text-white hover:border-white/20 transition-all text-sm">

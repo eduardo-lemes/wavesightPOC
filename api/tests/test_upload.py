@@ -65,7 +65,10 @@ def test_upload_multi_no_files(client, auth_headers):
 def test_health(client):
     resp = client.get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    data = resp.json()
+    assert data["status"] in ("ok", "degraded")
+    assert "version" in data
+    assert "database" in data
 
 
 def test_demo(client):

@@ -21,9 +21,13 @@ wavesight.db
 
 # Environment
 .env
+.env.prod
 
 # Docker
 docker-compose.override.yml
+
+# Archive
+_archive/
 
 # IDE
 .idea/

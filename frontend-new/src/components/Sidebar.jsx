@@ -19,7 +19,7 @@ export default function Sidebar({ view, setView }) {
       {/* Brand */}
       <div className={`m-3 rounded-2xl border border-[#1f2a36] overflow-hidden ${collapsed ? 'p-2' : 'p-3'}`}
         style={{ background: 'rgba(10,14,20,0.4)' }}>
-        <img src="/assets/logo.png" alt="WaveSight" className="w-full rounded-xl" />
+        <img src="/assets/wavesight-logo.svg" alt="WaveSight" className="w-full rounded-xl" />
       </div>
 
       {/* Nav */}
